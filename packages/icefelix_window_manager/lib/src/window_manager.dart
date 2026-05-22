@@ -1,5 +1,7 @@
 // Copyright 2026 icefelix.com. BSD-3-Clause.
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:icefelix_window_manager_platform_interface/icefelix_window_manager_platform_interface.dart';
@@ -7,6 +9,8 @@ import 'package:icefelix_window_manager_platform_interface/icefelix_window_manag
 import 'display.dart';
 import 'resize_direction.dart';
 import 'title_bar_style.dart';
+import 'window_displays.dart';
+import 'window_event.dart';
 import 'window_platform.dart';
 import 'window_snapshot.dart';
 import 'window_state.dart';
@@ -32,6 +36,10 @@ class WindowManager {
   final _SnapshotValueNotifier _snapshot = _SnapshotValueNotifier();
   WindowPlatform? _platform;
   bool _initialized = false;
+  final StreamController<WindowEvent> _events =
+      StreamController<WindowEvent>.broadcast();
+  late final WindowDisplays _displays = createWindowDisplays();
+  bool _closeRequestBlocked = false;
 
   /// Reactive snapshot of all window state.
   ///
@@ -52,6 +60,13 @@ class WindowManager {
     }
     return p;
   }
+
+  /// Multi-monitor sub-namespace.
+  WindowDisplays get displays => _displays;
+
+  /// All window-related events. **Broadcast stream** — multiple listeners OK.
+  /// Listeners should cancel subscriptions in widget `dispose()` to avoid leaks.
+  Stream<WindowEvent> get events => _events.stream;
 
   // =========================================================================
   // BOUNDS + SIZE + POSITION
@@ -257,8 +272,96 @@ class WindowManager {
   @visibleForTesting
   static void resetForTesting() {
     _instance._snapshot.dispose();
+    _instance._events.close();
+    _instance._displays.dispose();
     _instance = WindowManager._();
   }
+
+  // =========================================================================
+  // INTERNAL — FlutterApi callbacks (called by platform impl in W2-W4)
+  // =========================================================================
+
+  /// Called by platform when snapshot changes. Computes diff vs previous
+  /// snapshot and emits corresponding WindowEvent(s) on [events] stream.
+  void onSnapshotChanged(WindowSnapshotRaw pigeon) {
+    final newSnap = _convertSnapshot(pigeon);
+    final oldSnap = _snapshot._value;
+    _snapshot._set(newSnap);
+    if (oldSnap == null) return; // first emit, no diff
+
+    if (oldSnap.bounds.size != newSnap.bounds.size) {
+      _events.add(
+        WindowResizeEvent(
+          oldSize: oldSnap.bounds.size,
+          newSize: newSnap.bounds.size,
+        ),
+      );
+    }
+    if (oldSnap.bounds.position != newSnap.bounds.position) {
+      _events.add(
+        WindowMoveEvent(
+          oldPosition: oldSnap.bounds.position,
+          newPosition: newSnap.bounds.position,
+        ),
+      );
+    }
+    if (oldSnap.isFocused != newSnap.isFocused) {
+      _events.add(WindowFocusEvent(focused: newSnap.isFocused));
+    }
+    if (oldSnap.state != newSnap.state) {
+      _events.add(
+        WindowStateChangeEvent(
+          oldState: oldSnap.state,
+          newState: newSnap.state,
+        ),
+      );
+    }
+    if (oldSnap.currentDisplay != newSnap.currentDisplay) {
+      _events.add(
+        WindowDisplayChangeEvent(
+          oldDisplay: oldSnap.currentDisplay,
+          newDisplay: newSnap.currentDisplay,
+        ),
+      );
+    }
+  }
+
+  /// Called by platform when displays change (hot-plug).
+  void onDisplaysChanged(List<DisplayRaw> displays) {
+    _displays.handleDisplaysChanged(displays);
+  }
+
+  /// Called by platform when close is requested AND preventClose=true.
+  /// Returns true to allow close, false to block.
+  /// Fires WindowCloseRequestEvent synchronously; if consumer calls
+  /// preventDefault, returns false.
+  Future<bool> onCloseRequest() async {
+    _closeRequestBlocked = false;
+    final event = WindowCloseRequestEvent(
+      onPreventDefault: () {
+        _closeRequestBlocked = true;
+      },
+    );
+    _events.add(event);
+    // Yield one microtask cycle so synchronous handlers run.
+    await Future<void>.delayed(Duration.zero);
+    return !_closeRequestBlocked;
+  }
+
+  // =========================================================================
+  // TESTING HELPERS
+  // =========================================================================
+
+  @visibleForTesting
+  void debugSimulateSnapshotChange(WindowSnapshotRaw snap) =>
+      onSnapshotChanged(snap);
+
+  @visibleForTesting
+  Future<bool> debugSimulateCloseRequest() => onCloseRequest();
+
+  @visibleForTesting
+  void debugSimulateDisplaysChanged(List<DisplayRaw> displays) =>
+      onDisplaysChanged(displays);
 }
 
 // =========================================================================

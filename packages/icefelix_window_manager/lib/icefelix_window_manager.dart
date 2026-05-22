@@ -6,6 +6,7 @@ library;
 export 'src/display.dart';
 export 'src/resize_direction.dart';
 export 'src/title_bar_style.dart';
+export 'src/window_displays.dart' show WindowDisplays;
 export 'src/window_event.dart';
 export 'src/window_manager.dart';
 export 'src/window_platform.dart';
