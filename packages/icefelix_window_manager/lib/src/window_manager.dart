@@ -90,20 +90,27 @@ class WindowManager {
     );
   }
 
+  /// Set the window frame size (includes the titlebar on styles that have
+  /// one). [setSize], [setMinSize], [setMaxSize] and `snapshot.bounds.size`
+  /// all share this frame-based coordinate space. Top-left is preserved.
   Future<void> setSize(Size size) {
     return WindowManagerPlatform.instance.setSize(
       SizeRaw(width: size.width, height: size.height),
     );
   }
 
-  /// Set minimum window size. Pass `null` to clear constraint.
+  /// Set minimum window frame size. Pass `null` to clear the constraint.
+  /// Same coordinate space as [setSize] (frame, titlebar included). Future
+  /// drag-resize and `setSize` calls clamp against this bound.
   Future<void> setMinSize(Size? size) {
     return WindowManagerPlatform.instance.setMinSize(
       size == null ? null : SizeRaw(width: size.width, height: size.height),
     );
   }
 
-  /// Set maximum window size. Pass `null` to clear constraint.
+  /// Set maximum window frame size. Pass `null` to clear the constraint.
+  /// Same coordinate space as [setSize] (frame, titlebar included).
+  /// `maximize()` (zoom on macOS) also respects this bound.
   Future<void> setMaxSize(Size? size) {
     return WindowManagerPlatform.instance.setMaxSize(
       size == null ? null : SizeRaw(width: size.width, height: size.height),

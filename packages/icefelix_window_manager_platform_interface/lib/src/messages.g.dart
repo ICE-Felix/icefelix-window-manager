@@ -592,6 +592,9 @@ class WindowHostApi {
     }
   }
 
+  /// Set the window frame size (titlebar included on platforms that have one).
+  /// All size APIs and snapshot.bounds.size share this frame-based coordinate
+  /// space. Top-left position is preserved.
   Future<void> setSize(SizeRaw size) async {
     final String pigeonVar_channelName =
         'dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setSize$pigeonVar_messageChannelSuffix';
@@ -616,6 +619,9 @@ class WindowHostApi {
     }
   }
 
+  /// Set minimum window frame size, or `null` to clear the constraint.
+  /// Coordinate space matches [setSize] — same frame, including titlebar.
+  /// Future drag-resize and `setSize` calls clamp against this bound.
   Future<void> setMinSize(SizeRaw? size) async {
     final String pigeonVar_channelName =
         'dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setMinSize$pigeonVar_messageChannelSuffix';
@@ -640,6 +646,9 @@ class WindowHostApi {
     }
   }
 
+  /// Set maximum window frame size, or `null` to clear the constraint.
+  /// Coordinate space matches [setSize] — same frame, including titlebar.
+  /// `maximize()` (a.k.a. zoom) also respects this bound.
   Future<void> setMaxSize(SizeRaw? size) async {
     final String pigeonVar_channelName =
         'dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setMaxSize$pigeonVar_messageChannelSuffix';

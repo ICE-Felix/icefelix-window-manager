@@ -1,23 +1,59 @@
 # icefelix_window_manager
 
-Cross-platform window management for Flutter desktop — macOS, Windows, Linux (X11+Wayland).
+Window management for Flutter desktop apps — your app, your window.
+Control size, position, state, multi-monitor placement, frameless mode,
+title bar style, opacity, shadow, drag/resize regions, and listen to
+window/display events through a single reactive snapshot.
 
-⚠️ **Work in progress** — v0.1.0-dev. Public API stable when v0.1.0 ships (~26 June 2026).
+**Status:** macOS shipping in v0.1.0. Windows + Linux on the roadmap.
 
-## Status
+## Platform support
 
-- ✅ **W1: Dart foundation + Pigeon schema (2026-05-22)** — all Dart-side API + 71 unit tests
-- ✅ **W2: macOS native impl (2026-05-22)** — Swift + AppKit, 7 integration tests, comprehensive testbed app
-- ⏳ W3: Windows native impl (C++ + Win32)
-- ⏳ W4: Linux native impl (C++ + GTK + libdecor for Wayland)
-- ⏳ W5: 5+ scenario example + launch
+| Platform | Status | Version |
+|---|---|---|
+| macOS 10.15+ | ✅ Shipping | v0.1.0 (Swift + AppKit) |
+| Windows 10+ | ⏳ Planned | v0.2.x (C++ + Win32) |
+| Linux (X11 + Wayland) | ⏳ Planned | v0.3.x (C++ + GTK + libdecor) |
+
+Mobile (iOS, Android) and web are out of scope — Flutter does not give an
+embedded app control over the host window on those platforms.
 
 ## Packages
 
+This is a federated plugin: one app-facing package, one platform
+interface, and one implementation per platform.
+
 | Package | Purpose | pub.dev |
 |---|---|---|
-| `icefelix_window_manager` | app-facing | (pending publish) |
-| `icefelix_window_manager_platform_interface` | abstract API + Pigeon | (pending publish) |
+| [`icefelix_window_manager`](https://pub.dev/packages/icefelix_window_manager) | App-facing API | v0.1.0 |
+| [`icefelix_window_manager_platform_interface`](https://pub.dev/packages/icefelix_window_manager_platform_interface) | Abstract API + Pigeon schema | v0.1.0 |
+| [`icefelix_window_manager_macos`](https://pub.dev/packages/icefelix_window_manager_macos) | macOS implementation | v0.1.0 |
+
+App developers depend on `icefelix_window_manager` only; the federation
+resolves the right platform impl automatically.
+
+## Quick start
+
+```yaml
+# pubspec.yaml
+dependencies:
+  icefelix_window_manager: ^0.1.0
+```
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:icefelix_window_manager/icefelix_window_manager.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await WindowManager.instance.ensureInitialized();
+  runApp(const MyApp());
+}
+```
+
+See per-package READMEs for the full API surface and the example app at
+[`packages/icefelix_window_manager_macos/example/`](packages/icefelix_window_manager_macos/example/)
+exercising every method.
 
 ## License
 

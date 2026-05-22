@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.1.0] - 2026-05-22 — First stable (macOS-only)
+
+App-facing public API for the icefelix_window_manager federated plugin.
+macOS implementation ships in v0.1.0 of `icefelix_window_manager_macos`;
+Windows and Linux are on the roadmap.
+
+### Public API surface (frozen for v0.1.x)
+- `WindowManager` singleton: `ensureInitialized()`, `snapshot` (a
+  `ValueListenable<WindowSnapshot>`), `events` stream, every setter for
+  bounds / state / focus / drag-resize / lifecycle / title / properties /
+  visual / close interception
+- `WindowDisplays` sub-namespace with `list()`, `getCurrent()`,
+  `getPrimary()`, and a broadcast `events` stream
+  (`DisplayAdded/Removed/Changed`)
+- `WindowPlatform` introspection (`target`, `displayServer`, `isSandboxed`)
+- Sealed `WindowEvent` hierarchy (Resize, Move, Focus, StateChange,
+  DisplayChange, CloseRequest) and `DisplayEvent` hierarchy
+- `WindowCloseRequestEvent.preventDefault()` — sync, idempotent
+
+### Coordinate semantics (documented)
+- `setSize`, `setMinSize`, `setMaxSize`, and `snapshot.bounds.size` all
+  share frame coordinates (titlebar included on styles that have one).
+
 ## [0.1.0-dev.3] - 2026-05-22
 
 ### Added (W2 — macOS native impl)

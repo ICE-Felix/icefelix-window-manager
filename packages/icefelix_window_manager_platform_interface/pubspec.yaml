@@ -2,7 +2,7 @@ name: icefelix_window_manager_platform_interface
 description: >-
   Platform interface for icefelix_window_manager. Defines the abstract API and
   Pigeon-generated bindings. Used by platform implementations (macOS, Windows, Linux).
-version: 0.1.0-dev.1
+version: 0.1.0
 repository: https://github.com/ICE-Felix/icefelix-window-manager
 issue_tracker: https://github.com/ICE-Felix/icefelix-window-manager/issues
 homepage: https://icefelix.com/packages/window-manager
@@ -14,8 +14,6 @@ funding:
 
 platforms:
   macos:
-  windows:
-  linux:
 
 environment:
   sdk: ^3.6.0

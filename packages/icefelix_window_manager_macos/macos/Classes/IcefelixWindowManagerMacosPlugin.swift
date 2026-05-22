@@ -217,12 +217,16 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
 
   func setMinSize(size: SizeRaw?) throws {
     let w = try requireWindow()
+    // minSize (not contentMinSize) — keeps the constraint in frame coords so
+    // it composes cleanly with setSize / setBounds / snapshot.bounds (all
+    // frame-based). Was contentMinSize, which produced ~28px asymmetry on
+    // styles with a titlebar.
     if let s = size {
-      w.contentMinSize = NSSize(width: s.width, height: s.height)
+      w.minSize = NSSize(width: s.width, height: s.height)
     } else {
-      w.contentMinSize = NSSize(width: 0, height: 0)
+      w.minSize = NSSize(width: 0, height: 0)
     }
-    // contentMinSize change may auto-shrink the frame (which fires didResize),
+    // A constraint change may auto-shrink the frame (which fires didResize),
     // but if the current frame already satisfies the new constraint, no
     // notification fires — emit explicitly so the Dart snapshot stays in sync.
     scheduleSnapshotEmit()
@@ -230,11 +234,14 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
 
   func setMaxSize(size: SizeRaw?) throws {
     let w = try requireWindow()
+    // maxSize (not contentMaxSize) — frame-based, see setMinSize note. This
+    // is also what `zoom(_:)` clamps against, so a subsequent maximize() will
+    // honor the user's bound.
     if let s = size {
-      w.contentMaxSize = NSSize(width: s.width, height: s.height)
+      w.maxSize = NSSize(width: s.width, height: s.height)
     } else {
-      // Effectively unlimited.
-      w.contentMaxSize = NSSize(
+      // Effectively unlimited (NSWindow default).
+      w.maxSize = NSSize(
         width: CGFloat.greatestFiniteMagnitude,
         height: CGFloat.greatestFiniteMagnitude
       )
@@ -423,8 +430,10 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
 
     let startFrame = window.frame
     let startMouse = NSEvent.mouseLocation
-    let minW: CGFloat = max(window.contentMinSize.width, 100)
-    let minH: CGFloat = max(window.contentMinSize.height, 100)
+    // Frame-based minSize matches setMinSize() semantics; the 100px floor is
+    // a sanity safety net when no explicit constraint is set (minSize=(0,0)).
+    let minW: CGFloat = max(window.minSize.width, 100)
+    let minH: CGFloat = max(window.minSize.height, 100)
 
     activeResizeMonitor = NSEvent.addLocalMonitorForEvents(
       matching: [.leftMouseDragged, .leftMouseUp]
