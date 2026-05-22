@@ -2,6 +2,26 @@
 
 All notable changes documented here. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/).
 
+## [0.1.0-dev.3] - 2026-05-22 — W2 macOS native impl complete
+
+### Added
+- macOS platform implementation (Swift + AppKit) — packages/icefelix_window_manager_macos/
+- All WindowHostApi methods + FlutterApi event emission wired
+- ForwardingWindowDelegate for preventClose
+- Multi-monitor support (NSScreen → DisplayRaw conversion with CGDirectDisplayID
+  stable IDs, CGDisplayScreenSize for physical size, refresh rate via CGDisplayMode)
+- 10 ms event coalescing for high-frequency notifications
+- Example testbed app exercising every API surface
+- 7 integration tests on macOS
+
+### Fixed
+- Pure-property setters (setTitle, setAlwaysOnTop, setOpacity, etc.) now emit
+  snapshot changes via explicit scheduleSnapshotEmit() — fixes "snapshot stale
+  after property change" gap
+
+### Verified
+- macOS 14+ build green, integration tests pass, 76 unit tests pass (Dart side)
+
 ## [0.1.0-dev.1] - 2026-05-22 — W1 Dart foundation complete
 
 ### Added

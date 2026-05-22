@@ -5,13 +5,13 @@
 
 Cross-platform window management for Flutter desktop apps. Control your app's own window — size, position, state, multi-monitor, frameless mode, and events — with a type-safe Pigeon-backed API and reactive `ValueListenable<WindowSnapshot>` as the single source of truth.
 
-⚠️ **Pre-release: v0.1.0-dev.1.** Native implementations land in W2 (macOS), W3 (Windows), W4 (Linux). v0.1.0 stable ships ~26 June 2026. The Dart API in this dev release is the final shape.
+⚠️ **Pre-release: v0.1.0-dev.3.** Native implementations land in W2 (macOS ✅), W3 (Windows), W4 (Linux). v0.1.0 stable ships ~26 June 2026. The Dart API in this dev release is the final shape.
 
 ## Platform support
 
 | macOS | Windows | Linux (X11) | Linux (Wayland) |
 |:-:|:-:|:-:|:-:|
-| ⏳ W2 | ⏳ W3 | ⏳ W4 | ⏳ W4 |
+| ✅ v0.1.0-dev.3 | ⏳ W3 | ⏳ W4 | ⏳ W4 |
 
 ## Installation
 
@@ -64,7 +64,7 @@ WindowManager.instance.events.listen((event) {
 
 ## Status
 
-This is **W1 (Dart foundation)**. See [project tracker](https://github.com/ICE-Felix/icefelix-window-manager) for native implementation progress.
+This is **W2 (macOS native impl complete)**. See [project tracker](https://github.com/ICE-Felix/icefelix-window-manager) for Windows + Linux progress.
 
 ## License
 
