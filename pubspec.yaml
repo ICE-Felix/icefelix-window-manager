@@ -1,0 +1,10 @@
+name: icefelix_window_manager_workspace
+description: Melos workspace root for icefelix_window_manager federated plugin.
+publish_to: none
+environment:
+  sdk: ^3.6.0
+
+dev_dependencies:
+  melos: ^6.0.0
+  pana: ^0.22.0
+  pigeon: ^22.0.0

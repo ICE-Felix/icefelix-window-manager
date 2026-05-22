@@ -1,0 +1,36 @@
+name: icefelix_window_manager_workspace
+repository: https://github.com/ICE-Felix/icefelix-window-manager
+
+packages:
+  - packages/**
+  - "!packages/**/example/**"
+
+command:
+  bootstrap:
+    usePubspecOverrides: true
+  version:
+    branch: main
+    linkToCommits: true
+    workspaceChangelog: true
+    updateGitTagRefs: true
+
+scripts:
+  analyze:
+    description: Run dart analyze on all packages
+    exec: dart analyze --fatal-infos
+  format:
+    description: Verify dart format on all packages
+    exec: dart format --output=none --set-exit-if-changed .
+  test:
+    description: Run flutter test on packages with test folder
+    exec: flutter test
+    packageFilters:
+      dirExists: test
+  pana:
+    description: Run pana on each package (excludes example)
+    exec: dart pub global run pana --no-warning --exit-code-threshold 0
+    packageFilters:
+      noPrivate: true
+  pigeon:
+    description: Regenerate Pigeon bindings
+    run: dart run pigeon --input pigeons/window_api.dart
