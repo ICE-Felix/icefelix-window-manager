@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:icefelix_window_manager_platform_interface/icefelix_window_manager_platform_interface.dart';
 
 import 'display.dart';
+import 'resize_direction.dart';
 import 'title_bar_style.dart';
 import 'window_platform.dart';
 import 'window_snapshot.dart';
@@ -51,6 +52,187 @@ class WindowManager {
     }
     return p;
   }
+
+  // =========================================================================
+  // BOUNDS + SIZE + POSITION
+  // =========================================================================
+
+  /// Set window bounds. Coordinate system depends on [display]:
+  /// - If [display] is null: [bounds.position] is in **global** virtual desktop coords.
+  /// - If [display] is provided: [bounds.position] is **relative** to that display's origin.
+  /// - If [bounds.position] is null: only size applied (position unchanged).
+  ///
+  /// On Wayland: position is always ignored; size applied.
+  Future<void> setBounds(WindowBounds bounds, {DisplayId? display}) {
+    return WindowManagerPlatform.instance.setBounds(
+      WindowBoundsRaw(
+        position: bounds.position == null
+            ? null
+            : OffsetRaw(dx: bounds.position!.dx, dy: bounds.position!.dy),
+        size: SizeRaw(width: bounds.size.width, height: bounds.size.height),
+      ),
+      display?.value,
+    );
+  }
+
+  Future<void> setSize(Size size) {
+    return WindowManagerPlatform.instance.setSize(
+      SizeRaw(width: size.width, height: size.height),
+    );
+  }
+
+  /// Set minimum window size. Pass `null` to clear constraint.
+  Future<void> setMinSize(Size? size) {
+    return WindowManagerPlatform.instance.setMinSize(
+      size == null ? null : SizeRaw(width: size.width, height: size.height),
+    );
+  }
+
+  /// Set maximum window size. Pass `null` to clear constraint.
+  Future<void> setMaxSize(Size? size) {
+    return WindowManagerPlatform.instance.setMaxSize(
+      size == null ? null : SizeRaw(width: size.width, height: size.height),
+    );
+  }
+
+  /// Set window position in global virtual desktop coords. No-op on Wayland.
+  Future<void> setPosition(Offset position) {
+    return WindowManagerPlatform.instance.setPosition(
+      OffsetRaw(dx: position.dx, dy: position.dy),
+    );
+  }
+
+  Future<void> center() => WindowManagerPlatform.instance.center();
+
+  /// Move window to [display], **preserving relative position when possible**.
+  Future<void> moveToDisplay(DisplayId display) {
+    return WindowManagerPlatform.instance.moveToDisplay(display.value);
+  }
+
+  // =========================================================================
+  // STATE
+  // =========================================================================
+
+  Future<void> minimize() => WindowManagerPlatform.instance.minimize();
+  Future<void> maximize() => WindowManagerPlatform.instance.maximize();
+  Future<void> unmaximize() => WindowManagerPlatform.instance.unmaximize();
+  Future<void> restore() => WindowManagerPlatform.instance.restore();
+  Future<void> hide() => WindowManagerPlatform.instance.hide();
+  Future<void> show() => WindowManagerPlatform.instance.show();
+  Future<void> fullscreen() => WindowManagerPlatform.instance.fullscreen();
+  Future<void> exitFullscreen() =>
+      WindowManagerPlatform.instance.exitFullscreen();
+
+  // =========================================================================
+  // FOCUS
+  // =========================================================================
+
+  Future<void> focus() => WindowManagerPlatform.instance.focus();
+  Future<void> blur() => WindowManagerPlatform.instance.blur();
+
+  // =========================================================================
+  // DRAG + RESIZE (frameless essentials)
+  // =========================================================================
+
+  /// Begin native window drag. Call from a pointer-down handler on a draggable
+  /// region widget (e.g. custom title bar). Essential for frameless windows.
+  Future<void> startDrag() => WindowManagerPlatform.instance.startDrag();
+
+  /// Begin native window resize in [direction]. Call from a pointer-down handler
+  /// on a resize handle widget. Essential for frameless windows.
+  Future<void> startResize(ResizeDirection direction) {
+    final raw = switch (direction) {
+      ResizeDirection.top => ResizeDirectionRaw.top,
+      ResizeDirection.bottom => ResizeDirectionRaw.bottom,
+      ResizeDirection.left => ResizeDirectionRaw.left,
+      ResizeDirection.right => ResizeDirectionRaw.right,
+      ResizeDirection.topLeft => ResizeDirectionRaw.topLeft,
+      ResizeDirection.topRight => ResizeDirectionRaw.topRight,
+      ResizeDirection.bottomLeft => ResizeDirectionRaw.bottomLeft,
+      ResizeDirection.bottomRight => ResizeDirectionRaw.bottomRight,
+    };
+    return WindowManagerPlatform.instance.startResize(raw);
+  }
+
+  // =========================================================================
+  // LIFECYCLE
+  // =========================================================================
+
+  /// Request window close. Triggers same flow as user clicking the X button:
+  /// fires WindowCloseRequestEvent if setPreventClose was called with true,
+  /// otherwise closes immediately.
+  Future<void> close() => WindowManagerPlatform.instance.close();
+
+  /// Force-close window WITHOUT firing close-request event.
+  /// Bypasses any [setPreventClose] interception.
+  Future<void> destroy() => WindowManagerPlatform.instance.destroy();
+
+  // =========================================================================
+  // TITLE + PROPERTIES
+  // =========================================================================
+
+  Future<void> setTitle(String title) =>
+      WindowManagerPlatform.instance.setTitle(title);
+  Future<void> setAlwaysOnTop(bool value) =>
+      WindowManagerPlatform.instance.setAlwaysOnTop(value);
+  Future<void> setSkipTaskbar(bool value) =>
+      WindowManagerPlatform.instance.setSkipTaskbar(value);
+  Future<void> setResizable(bool value) =>
+      WindowManagerPlatform.instance.setResizable(value);
+  Future<void> setMovable(bool value) =>
+      WindowManagerPlatform.instance.setMovable(value);
+  Future<void> setMinimizable(bool value) =>
+      WindowManagerPlatform.instance.setMinimizable(value);
+  Future<void> setMaximizable(bool value) =>
+      WindowManagerPlatform.instance.setMaximizable(value);
+  Future<void> setClosable(bool value) =>
+      WindowManagerPlatform.instance.setClosable(value);
+
+  // =========================================================================
+  // FRAMELESS + TITLE BAR
+  // =========================================================================
+
+  Future<void> setFrameless(bool value) =>
+      WindowManagerPlatform.instance.setFrameless(value);
+
+  Future<void> setTitleBarStyle(TitleBarStyle style) {
+    final raw = switch (style) {
+      TitleBarStyle.normal => TitleBarStyleRaw.normal,
+      TitleBarStyle.hidden => TitleBarStyleRaw.hidden,
+      TitleBarStyle.hiddenInset => TitleBarStyleRaw.hiddenInset,
+    };
+    return WindowManagerPlatform.instance.setTitleBarStyle(raw);
+  }
+
+  // =========================================================================
+  // VISUAL
+  // =========================================================================
+
+  /// Opacity 0.0 (transparent) to 1.0 (opaque). No-op on Wayland.
+  Future<void> setOpacity(double opacity) =>
+      WindowManagerPlatform.instance.setOpacity(opacity);
+
+  Future<void> setBackgroundColor(Color color) =>
+      WindowManagerPlatform.instance.setBackgroundColor(color.toARGB32());
+
+  Future<void> setHasShadow(bool value) =>
+      WindowManagerPlatform.instance.setHasShadow(value);
+
+  /// Native icon file. Use platform-appropriate format: .ico (Windows), .icns
+  /// (macOS), .png (Linux). Path must be **absolute filesystem path**; Flutter
+  /// asset URIs not supported in v0.1.0.
+  Future<void> setIcon(String filesystemPath) =>
+      WindowManagerPlatform.instance.setIcon(filesystemPath);
+
+  // =========================================================================
+  // CLOSE INTERCEPTION
+  // =========================================================================
+
+  /// When true, close attempts fire WindowCloseRequestEvent on events stream
+  /// (added in Task 8) INSTEAD of closing immediately. Consumer must call
+  /// `preventDefault()` synchronously in handler to block; otherwise close proceeds.
+  Future<void> setPreventClose(bool value) =>
+      WindowManagerPlatform.instance.setPreventClose(value);
 
   /// Initializes platform-side hooks + populates the initial snapshot.
   ///
