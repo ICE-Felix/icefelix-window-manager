@@ -4,14 +4,18 @@ import Cocoa
 import FlutterMacOS
 
 /// Plugin registration entry point. Wires WindowHostApi to a real NSWindow
-/// implementation. W2.2 covered bounds, state machine, focus, and lifecycle;
-/// W2.3 adds drag/resize, title/properties/visual, and frameless. Multi-monitor
-/// and FlutterApi event emission land in W2.4.
+/// implementation, and constructs a `WindowFlutterApi` caller so the native
+/// layer can push snapshot/displays/close-request events back into Dart.
 public class IcefelixWindowManagerMacosPlugin: NSObject, FlutterPlugin {
   public static func register(with registrar: FlutterPluginRegistrar) {
     let messenger = registrar.messenger
     let api = WindowHostApiImpl(registrar: registrar)
     WindowHostApiSetup.setUp(binaryMessenger: messenger, api: api)
+
+    // FlutterApi caller for native → Dart event emission. The Dart side
+    // installs the corresponding handler via WindowFlutterApi.setUp().
+    let flutterApi = WindowFlutterApi(binaryMessenger: messenger)
+    api.setFlutterApi(flutterApi)
   }
 }
 
@@ -19,15 +23,20 @@ public class IcefelixWindowManagerMacosPlugin: NSObject, FlutterPlugin {
 ///
 /// Flutter uses logical px with origin = top-left, Y-axis growing down.
 /// AppKit uses points with origin = bottom-left, Y-axis growing up.
-/// Conversions below are anchored to the window's current screen (W2.2 scope —
-/// proper multi-monitor virtual coord space arrives in W2.4).
+///
+/// All conversions are anchored on the PRIMARY screen (NSScreen.screens.first)
+/// so that window position + display bounds share a single virtual coordinate
+/// space — matches the Dart-side expectation that `DisplayRaw.bounds` and
+/// `WindowBoundsRaw.position` are directly comparable.
 extension NSWindow {
-  /// Returns the window frame expressed in Flutter coordinates
-  /// (top-left origin, Y-down) on the window's current screen.
+  /// Returns the window frame expressed in Flutter virtual coordinates
+  /// (top-left origin, Y-down, anchored on the primary screen).
   func frameInFlutterCoords() -> NSRect {
-    guard let screen = self.screen ?? NSScreen.main else { return frame }
+    let primaryHeight = NSScreen.screens.first?.frame.height
+      ?? self.screen?.frame.height
+      ?? frame.height
     let cocoa = frame
-    let flutterY = screen.frame.height - (cocoa.origin.y + cocoa.height)
+    let flutterY = primaryHeight - (cocoa.origin.y + cocoa.height)
     return NSRect(
       x: cocoa.origin.x,
       y: flutterY,
@@ -36,11 +45,13 @@ extension NSWindow {
     )
   }
 
-  /// Sets the window frame from a rect expressed in Flutter coordinates
-  /// (top-left origin, Y-down) on the window's current screen.
+  /// Sets the window frame from a rect expressed in Flutter virtual
+  /// coordinates (top-left origin, Y-down, anchored on the primary screen).
   func setFrameFromFlutterCoords(_ rect: NSRect, display: Bool = true) {
-    guard let screen = self.screen ?? NSScreen.main else { return }
-    let cocoaY = screen.frame.height - (rect.origin.y + rect.height)
+    let primaryHeight = NSScreen.screens.first?.frame.height
+      ?? self.screen?.frame.height
+      ?? rect.height
+    let cocoaY = primaryHeight - (rect.origin.y + rect.height)
     setFrame(
       NSRect(x: rect.origin.x, y: cocoaY, width: rect.width, height: rect.height),
       display: display
@@ -52,20 +63,21 @@ extension NSWindow {
 ///
 /// Scope coverage:
 /// - W2.2: init, bounds, state machine, focus, lifecycle.
-/// - W2.3 (this file): drag/resize, title/properties, frameless, visual.
-/// - W2.4: multi-monitor (listDisplays/getCurrentDisplay/getPrimaryDisplay,
-///   moveToDisplay, proper DisplayRaw conversion) + FlutterApi event emission
-///   + close-request interception via NSWindowDelegate.
-class WindowHostApiImpl: WindowHostApi {
+/// - W2.3: drag/resize, title/properties, frameless, visual.
+/// - W2.4 (this file): multi-monitor (listDisplays/getCurrentDisplay/
+///   getPrimaryDisplay, moveToDisplay, proper DisplayRaw conversion)
+///   + FlutterApi event emission (onSnapshotChanged with 10ms coalescing,
+///   onDisplaysChanged on hot-plug)
+///   + close-request interception via NSWindowDelegate proxy.
+class WindowHostApiImpl: NSObject, WindowHostApi {
   private weak var registrar: FlutterPluginRegistrar?
 
-  /// W2.2: just stored. W2.4 wires NSWindowDelegate.windowShouldClose: to
-  /// fire FlutterApi.onCloseRequest and block the close until Dart responds.
+  /// Stored close-intercept toggle. Honored by the NSWindowDelegate proxy
+  /// (`ForwardingWindowDelegate`) installed during `ensureInitialized`.
   private var preventCloseFlag = false
 
   /// Flags for properties that aren't directly introspectable from NSWindow
-  /// state. Real platform-state introspection arrives in W2.4 once
-  /// NSWindowDelegate hooks are wired.
+  /// state.
   private var alwaysOnTopFlag = false
   private var skipTaskbarFlag = false
   private var maximizableFlag = true
@@ -76,8 +88,46 @@ class WindowHostApiImpl: WindowHostApi {
   /// that tracks mouse drags + computes new frames until mouse-up.
   private var activeResizeMonitor: Any?
 
+  /// FlutterApi caller for native → Dart event emission. Injected from
+  /// `IcefelixWindowManagerMacosPlugin.register` after Pigeon setUp.
+  private var flutterApi: WindowFlutterApi?
+
+  /// In-flight coalesced snapshot emit. We cancel + reschedule on every
+  /// window event to avoid flooding the Dart isolate during high-frequency
+  /// notifications (drag-resize fires didResize at 60 Hz+).
+  private var snapshotEmitWorkItem: DispatchWorkItem?
+
+  /// Notification observers installed on first `ensureInitialized`; removed
+  /// in `deinit`.
+  private var notificationObservers: [Any] = []
+
+  /// NSWindowDelegate proxy installed on first `ensureInitialized`. Wraps
+  /// any pre-existing Flutter-installed delegate via forwardingTarget(for:).
+  private var customDelegate: ForwardingWindowDelegate?
+  private weak var originalDelegate: NSWindowDelegate?
+
   init(registrar: FlutterPluginRegistrar) {
     self.registrar = registrar
+    super.init()
+  }
+
+  /// Injection point for the Pigeon-generated FlutterApi caller. Called from
+  /// the plugin's `register(with:)` after `WindowHostApiSetup.setUp`.
+  func setFlutterApi(_ api: WindowFlutterApi) {
+    self.flutterApi = api
+  }
+
+  deinit {
+    notificationObservers.forEach { NotificationCenter.default.removeObserver($0) }
+    snapshotEmitWorkItem?.cancel()
+    if let m = activeResizeMonitor {
+      NSEvent.removeMonitor(m)
+    }
+    // Restore the original delegate if we replaced it, so the host app's
+    // delegate chain is intact after the plugin tears down.
+    if let w = window, let proxy = customDelegate, w.delegate === proxy {
+      w.delegate = originalDelegate
+    }
   }
 
   /// Resolves the NSWindow that hosts the FlutterViewController for this
@@ -98,16 +148,14 @@ class WindowHostApiImpl: WindowHostApi {
     return w
   }
 
-  private func todo(_ method: String) -> Never {
-    fatalError(
-      "icefelix_window_manager_macos: \(method) — not implemented yet (W2.4 pending)"
-    )
-  }
-
   // ============ INIT ============
 
   func ensureInitialized() throws -> WindowSnapshotRaw {
     let w = try requireWindow()
+    if notificationObservers.isEmpty {
+      installNotificationObservers(window: w)
+      installWindowDelegate(window: w)
+    }
     return buildSnapshot(window: w)
   }
 
@@ -137,8 +185,10 @@ class WindowHostApiImpl: WindowHostApi {
 
   func setBounds(bounds: WindowBoundsRaw, displayId: String?) throws {
     let w = try requireWindow()
-    // W2.2: ignore displayId. Multi-monitor logic comes in W2.4 once
-    // listDisplays() establishes stable display IDs.
+    // displayId is currently ignored here; callers that need to move across
+    // displays should invoke moveToDisplay() explicitly. Combining the two
+    // in one call is a future polish item once we can validate that the
+    // target display contains the requested rect.
     let size = bounds.size
     let currentFlutterFrame = w.frameInFlutterCoords()
     let pos = bounds.position
@@ -205,8 +255,47 @@ class WindowHostApiImpl: WindowHostApi {
   }
 
   func moveToDisplay(displayId: String) throws {
-    // W2.4: needs NSScreen enumeration + stable DisplayId mapping.
-    todo("moveToDisplay (W2.4)")
+    let w = try requireWindow()
+    guard let displayID = UInt32(displayId) else {
+      throw PigeonError(
+        code: "invalid_display_id",
+        message: "Display ID '\(displayId)' is not a numeric CGDirectDisplayID",
+        details: nil
+      )
+    }
+    let target = NSScreen.screens.first { screen in
+      (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?
+        .uint32Value == displayID
+    }
+    guard let targetScreen = target else {
+      throw PigeonError(
+        code: "display_not_found",
+        message: "No NSScreen with ID \(displayId)",
+        details: nil
+      )
+    }
+    // Preserve relative position within the current display; center on the
+    // target if the relative-position rect doesn't fit inside it.
+    let currentScreen = w.screen ?? NSScreen.main ?? targetScreen
+    let curFrame = currentScreen.frame
+    let relX = curFrame.width > 0
+      ? (w.frame.origin.x - curFrame.origin.x) / curFrame.width
+      : 0
+    let relY = curFrame.height > 0
+      ? (w.frame.origin.y - curFrame.origin.y) / curFrame.height
+      : 0
+
+    let tgtFrame = targetScreen.frame
+    let newX = tgtFrame.origin.x + relX * tgtFrame.width
+    let newY = tgtFrame.origin.y + relY * tgtFrame.height
+    var newFrame = w.frame
+    newFrame.origin = NSPoint(x: newX, y: newY)
+
+    if !tgtFrame.contains(newFrame) {
+      newFrame.origin.x = tgtFrame.midX - newFrame.width / 2
+      newFrame.origin.y = tgtFrame.midY - newFrame.height / 2
+    }
+    w.setFrame(newFrame, display: true)
   }
 
   // ============ STATE MACHINE ============
@@ -394,8 +483,9 @@ class WindowHostApiImpl: WindowHostApi {
 
   func close() throws {
     let w = try requireWindow()
-    // Goes through NSWindowDelegate.windowShouldClose: — W2.4 hooks this
-    // to honor preventCloseFlag and emit FlutterApi.onCloseRequest.
+    // Goes through NSWindowDelegate.windowShouldClose:, which our
+    // ForwardingWindowDelegate intercepts to honor preventCloseFlag and
+    // emit FlutterApi.onCloseRequest before actually closing.
     w.performClose(nil)
   }
 
@@ -554,16 +644,39 @@ class WindowHostApiImpl: WindowHostApi {
   // ============ CLOSE INTERCEPTION ============
 
   func setPreventClose(value: Bool) throws {
-    // W2.2: store only. W2.4 wires NSWindowDelegate.windowShouldClose: to
-    // emit FlutterApi.onCloseRequest and block close until Dart responds.
+    // Honored by ForwardingWindowDelegate.windowShouldClose(_:), which the
+    // first ensureInitialized() call installs on the host NSWindow.
     preventCloseFlag = value
   }
 
-  // ============ MULTI-MONITOR (W2.4) ============
+  // ============ MULTI-MONITOR ============
 
-  func listDisplays() throws -> [DisplayRaw] { todo("listDisplays (W2.4)") }
-  func getCurrentDisplay() throws -> DisplayRaw { todo("getCurrentDisplay (W2.4)") }
-  func getPrimaryDisplay() throws -> DisplayRaw { todo("getPrimaryDisplay (W2.4)") }
+  func listDisplays() throws -> [DisplayRaw] {
+    return NSScreen.screens.map(displayRawFromScreen)
+  }
+
+  func getCurrentDisplay() throws -> DisplayRaw {
+    let w = try requireWindow()
+    guard let screen = w.screen ?? NSScreen.main ?? NSScreen.screens.first else {
+      throw PigeonError(
+        code: "no_screens",
+        message: "No NSScreens available",
+        details: nil
+      )
+    }
+    return displayRawFromScreen(screen)
+  }
+
+  func getPrimaryDisplay() throws -> DisplayRaw {
+    guard let primary = NSScreen.screens.first else {
+      throw PigeonError(
+        code: "no_screens",
+        message: "No NSScreens available",
+        details: nil
+      )
+    }
+    return displayRawFromScreen(primary)
+  }
 
   // ============ SNAPSHOT BUILDER (private helper) ============
 
@@ -594,7 +707,8 @@ class WindowHostApiImpl: WindowHostApi {
       movable: window.isMovable,
       minimizable: window.styleMask.contains(.miniaturizable),
       // No dedicated macOS bit for "maximizable"; mirror the flag set via
-      // setMaximizable. Real enforcement (delegate-driven) lands in W2.4.
+      // setMaximizable. True enforcement would require
+      // NSWindowDelegate.windowShouldZoom(_:toFrame:) returning false.
       maximizable: maximizableFlag,
       closable: window.styleMask.contains(.closable),
       frameless: !window.styleMask.contains(.titled),
@@ -603,7 +717,7 @@ class WindowHostApiImpl: WindowHostApi {
       backgroundColorArgb: argbFromNSColor(window.backgroundColor),
       hasShadow: window.hasShadow,
       preventClose: preventCloseFlag,
-      currentDisplay: placeholderDisplay(screen)
+      currentDisplay: displayRawFromScreen(screen)
     )
   }
 
@@ -624,36 +738,245 @@ class WindowHostApiImpl: WindowHostApi {
     return Int64((a << 24) | (r << 16) | (g << 8) | b)
   }
 
-  /// W2.2 placeholder. W2.4 replaces with proper DisplayRaw conversion that:
-  /// - assigns stable IDs from NSScreenNumber (CGDirectDisplayID)
-  /// - converts NSScreen.frame from AppKit (bottom-left) → Flutter (top-left)
-  ///   coordinates relative to the virtual desktop origin
-  /// - resolves physical width/height/DPI via CGDisplay APIs
-  /// - reads refresh rate via CGDisplayModeGetRefreshRate
-  private func placeholderDisplay(_ screen: NSScreen) -> DisplayRaw {
-    let frame = screen.frame
-    let workArea = screen.visibleFrame
+  // ============ DISPLAY CONVERSION (private helper) ============
+
+  /// Converts an NSScreen to the cross-platform DisplayRaw shape:
+  /// - id: CGDirectDisplayID stringified (stable for the process session)
+  /// - bounds/workArea: re-projected from AppKit (bottom-left, Y-up) to
+  ///   Flutter (top-left, Y-down) coordinates anchored on the PRIMARY
+  ///   screen's origin (matches NSScreen.screens.first, which is the
+  ///   user-designated primary display in System Settings → Displays)
+  /// - physicalWidthMm / physicalHeightMm: from CGDisplayScreenSize, nullable
+  ///   when the EDID reports 0×0 (e.g., virtual displays, mirrored sessions)
+  /// - dpi: derived from physical mm + native pixel dimensions, nullable
+  ///   when physical size is unknown
+  /// - refreshRate: from CGDisplayCopyDisplayMode, nullable when the mode
+  ///   is unavailable or the panel reports 0 Hz (some VMs / virtual displays)
+  /// - isPrimary: matches NSScreen.screens.first (the virtual-coord origin)
+  private func displayRawFromScreen(_ screen: NSScreen) -> DisplayRaw {
+    let screenNumber = screen.deviceDescription[
+      NSDeviceDescriptionKey("NSScreenNumber")
+    ] as? NSNumber
+    let displayID = screenNumber.map { CGDirectDisplayID($0.uint32Value) } ?? 0
+
+    // Physical size in millimetres; CGDisplayScreenSize returns CGSize(0,0)
+    // when unknown (typical for virtual / mirrored displays).
+    let physicalSize = CGDisplayScreenSize(displayID)
+    let physicalW: Double? = physicalSize.width > 0 ? Double(physicalSize.width) : nil
+    let physicalH: Double? = physicalSize.height > 0 ? Double(physicalSize.height) : nil
+
+    // DPI from physical mm + native pixel dimensions, when both known.
+    var dpi: Double? = nil
+    if let pw = physicalW, pw > 0 {
+      let pixelWidth = Double(screen.frame.width) * Double(screen.backingScaleFactor)
+      let inchesWide = pw / 25.4
+      if inchesWide > 0 {
+        dpi = pixelWidth / inchesWide
+      }
+    }
+
+    // Refresh rate; CGDisplayModeGetRefreshRate returns 0.0 when the panel
+    // doesn't advertise a refresh (some VMs).
+    let refreshRate: Int64? = {
+      guard let mode = CGDisplayCopyDisplayMode(displayID) else { return nil }
+      let rr = mode.refreshRate
+      return rr > 0 ? Int64(round(rr)) : nil
+    }()
+
+    // Y-flip relative to the primary screen so all displays share a single
+    // Flutter virtual coordinate space (top-left origin at primary's
+    // top-left, growing down + right). Matches the protocol Linux/Windows
+    // backends are expected to honor.
+    let primaryHeight = NSScreen.screens.first?.frame.height ?? screen.frame.height
+    let cocoaFrame = screen.frame
+    let cocoaWorkArea = screen.visibleFrame
+    let flutterFrameY = primaryHeight - (cocoaFrame.origin.y + cocoaFrame.height)
+    let flutterWorkY = primaryHeight - (cocoaWorkArea.origin.y + cocoaWorkArea.height)
+
     return DisplayRaw(
-      id: "screen-placeholder",
+      id: String(displayID),
       name: screen.localizedName,
       bounds: RectRaw(
-        x: frame.origin.x,
-        y: frame.origin.y,
-        width: frame.width,
-        height: frame.height
+        x: cocoaFrame.origin.x,
+        y: flutterFrameY,
+        width: cocoaFrame.width,
+        height: cocoaFrame.height
       ),
       workArea: RectRaw(
-        x: workArea.origin.x,
-        y: workArea.origin.y,
-        width: workArea.width,
-        height: workArea.height
+        x: cocoaWorkArea.origin.x,
+        y: flutterWorkY,
+        width: cocoaWorkArea.width,
+        height: cocoaWorkArea.height
       ),
-      physicalWidthMm: nil,
-      physicalHeightMm: nil,
-      dpi: nil,
+      physicalWidthMm: physicalW,
+      physicalHeightMm: physicalH,
+      dpi: dpi,
       scaleFactor: Double(screen.backingScaleFactor),
-      isPrimary: screen == NSScreen.main,
-      refreshRate: nil
+      // NSScreen.screens[0] is the user-designated primary display
+      // (the one with the menu bar, top-left of the virtual coord space).
+      isPrimary: screen == NSScreen.screens.first,
+      refreshRate: refreshRate
     )
+  }
+
+  // ============ EVENT EMISSION ============
+
+  /// Coalesces snapshot emit calls to ~10 ms to avoid flooding the Dart
+  /// isolate during high-frequency notifications (drag-resize fires
+  /// didResize at 60 Hz+, didMove similarly during drag).
+  private func scheduleSnapshotEmit() {
+    snapshotEmitWorkItem?.cancel()
+    let work = DispatchWorkItem { [weak self] in
+      self?.emitSnapshotNow()
+    }
+    snapshotEmitWorkItem = work
+    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(10), execute: work)
+  }
+
+  private func emitSnapshotNow() {
+    guard let w = window, let api = flutterApi else { return }
+    let snapshot = buildSnapshot(window: w)
+    api.onSnapshotChanged(snapshot: snapshot) { _ in /* ignore */ }
+  }
+
+  private func emitDisplaysChanged() {
+    guard let api = flutterApi else { return }
+    let displays = NSScreen.screens.map(displayRawFromScreen)
+    api.onDisplaysChanged(displays: displays) { _ in /* ignore */ }
+  }
+
+  /// Subscribes to NSWindow lifecycle notifications (size/position/focus/
+  /// state/screen) and NSApplication.didChangeScreenParameters so the
+  /// Dart side stays in sync with platform-driven changes (user drags
+  /// window, toggles fullscreen via menu, plugs in / unplugs a monitor).
+  private func installNotificationObservers(window: NSWindow) {
+    let nc = NotificationCenter.default
+    let queue = OperationQueue.main
+
+    let snapshotTriggers: [Notification.Name] = [
+      NSWindow.didResizeNotification,
+      NSWindow.didMoveNotification,
+      NSWindow.didBecomeKeyNotification,
+      NSWindow.didResignKeyNotification,
+      NSWindow.didMiniaturizeNotification,
+      NSWindow.didDeminiaturizeNotification,
+      NSWindow.didEnterFullScreenNotification,
+      NSWindow.didExitFullScreenNotification,
+      NSWindow.didChangeScreenNotification,
+    ]
+    for name in snapshotTriggers {
+      let token = nc.addObserver(forName: name, object: window, queue: queue) {
+        [weak self] _ in self?.scheduleSnapshotEmit()
+      }
+      notificationObservers.append(token)
+    }
+
+    let displaysToken = nc.addObserver(
+      forName: NSApplication.didChangeScreenParametersNotification,
+      object: nil,
+      queue: queue
+    ) { [weak self] _ in
+      self?.emitDisplaysChanged()
+    }
+    notificationObservers.append(displaysToken)
+  }
+
+  // ============ CLOSE INTERCEPT (NSWindowDelegate proxy) ============
+
+  /// Installs a `ForwardingWindowDelegate` proxy that intercepts only
+  /// `windowShouldClose:`, forwarding every other selector to the original
+  /// delegate (typically Flutter's FlutterViewController-installed one).
+  /// This lets us honor `preventClose` without breaking Flutter's normal
+  /// window-event flow.
+  private func installWindowDelegate(window: NSWindow) {
+    let original = window.delegate
+    let proxy = ForwardingWindowDelegate(
+      original: original,
+      onShouldClose: { [weak self] in self?.handleShouldClose() ?? true }
+    )
+    self.originalDelegate = original
+    self.customDelegate = proxy
+    window.delegate = proxy
+  }
+
+  /// Called by `ForwardingWindowDelegate` from `windowShouldClose:`.
+  /// Returns true to allow immediate close, false to block.
+  ///
+  /// When `preventCloseFlag` is true and a FlutterApi caller is available:
+  ///  - fire `onCloseRequest` (async, returns Bool from Dart)
+  ///  - return false now to block the immediate close
+  ///  - on Dart response, either call `window.close()` to actually close
+  ///    (bypassing the delegate, which would re-trigger preventClose) or
+  ///    do nothing (window stays open)
+  ///  - on Pigeon channel error, default to allow close (don't trap the user
+  ///    in a window they can't dismiss)
+  private func handleShouldClose() -> Bool {
+    guard preventCloseFlag, let api = flutterApi else { return true }
+    api.onCloseRequest { [weak self] result in
+      guard let self = self else { return }
+      switch result {
+      case .success(let allow):
+        if allow {
+          DispatchQueue.main.async { [weak self] in
+            self?.window?.close()
+          }
+        }
+      case .failure:
+        DispatchQueue.main.async { [weak self] in
+          self?.window?.close()
+        }
+      }
+    }
+    return false
+  }
+}
+
+// MARK: - ForwardingWindowDelegate
+
+/// Wraps any pre-existing NSWindowDelegate, intercepting `windowShouldClose:`
+/// to drive icefelix_window_manager's preventClose flow while forwarding
+/// every other selector to the original delegate (typically Flutter's
+/// FlutterViewController-installed delegate). Uses `forwardingTarget(for:)`
+/// for transparent NSInvocation forwarding rather than re-implementing every
+/// NSWindowDelegate method.
+class ForwardingWindowDelegate: NSObject, NSWindowDelegate {
+  weak var original: NSWindowDelegate?
+  let onShouldClose: () -> Bool
+
+  init(original: NSWindowDelegate?, onShouldClose: @escaping () -> Bool) {
+    self.original = original
+    self.onShouldClose = onShouldClose
+    super.init()
+  }
+
+  // Intercept the one method we care about. Give the original delegate
+  // (if any) first refusal — if it denies the close, we never reach our
+  // own preventClose logic.
+  func windowShouldClose(_ sender: NSWindow) -> Bool {
+    if let orig = original,
+      orig.responds(to: #selector(NSWindowDelegate.windowShouldClose(_:)))
+    {
+      if let answer = orig.windowShouldClose?(sender), !answer {
+        return false
+      }
+    }
+    return onShouldClose()
+  }
+
+  // Forward every other selector to the original delegate via NSInvocation,
+  // so methods like windowDidBecomeKey, windowWillResize:toSize:, etc. still
+  // reach Flutter's delegate exactly as if we weren't in the chain.
+  override func responds(to aSelector: Selector!) -> Bool {
+    if aSelector == #selector(NSWindowDelegate.windowShouldClose(_:)) {
+      return true
+    }
+    return original?.responds(to: aSelector) ?? super.responds(to: aSelector)
+  }
+
+  override func forwardingTarget(for aSelector: Selector!) -> Any? {
+    if let original = original, original.responds(to: aSelector) {
+      return original
+    }
+    return nil
   }
 }
