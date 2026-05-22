@@ -45,8 +45,7 @@ abstract class WindowManagerPlatform extends PlatformInterface {
       throw UnimplementedError('setMaxSize() not implemented');
   Future<void> setPosition(OffsetRaw position) =>
       throw UnimplementedError('setPosition() not implemented');
-  Future<void> center() =>
-      throw UnimplementedError('center() not implemented');
+  Future<void> center() => throw UnimplementedError('center() not implemented');
   Future<void> moveToDisplay(String displayId) =>
       throw UnimplementedError('moveToDisplay() not implemented');
 
