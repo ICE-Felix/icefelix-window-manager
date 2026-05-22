@@ -10,6 +10,15 @@ class MockWindowManagerPlatform extends Mock
     with MockPlatformInterfaceMixin
     implements WindowManagerPlatform {}
 
+class _FakeWindowFlutterApi implements WindowFlutterApi {
+  @override
+  void onSnapshotChanged(WindowSnapshotRaw snapshot) {}
+  @override
+  void onDisplaysChanged(List<DisplayRaw> displays) {}
+  @override
+  bool onCloseRequest() => true;
+}
+
 DisplayRaw _sampleDisplayRaw() => DisplayRaw(
       id: 'm1',
       name: 'Mock Display',
@@ -57,6 +66,7 @@ void main() {
     );
     registerFallbackValue(ResizeDirectionRaw.top);
     registerFallbackValue(TitleBarStyleRaw.normal);
+    registerFallbackValue(_FakeWindowFlutterApi());
   });
 
   late MockWindowManagerPlatform mock;
@@ -490,6 +500,43 @@ void main() {
       verify(() => mock.setTitleBarStyle(TitleBarStyleRaw.hidden)).called(1);
       verify(() => mock.setTitleBarStyle(TitleBarStyleRaw.hiddenInset))
           .called(1);
+    });
+  });
+
+  group('WindowManager FlutterApi wiring (W1.1 patch C1)', () {
+    test('ensureInitialized calls registerFlutterApi with adapter', () async {
+      when(mock.ensureInitialized)
+          .thenAnswer((_) async => _sampleSnapshotRaw());
+      when(mock.getPlatformInfo).thenAnswer(
+        (_) async => PlatformInfoRaw(target: 'macos', isSandboxed: false),
+      );
+      when(() => mock.registerFlutterApi(any())).thenReturn(null);
+
+      await WindowManager.instance.ensureInitialized();
+
+      verify(() => mock.registerFlutterApi(any(that: isA<WindowFlutterApi>())))
+          .called(1);
+    });
+
+    test('adapter forwards onSnapshotChanged to WindowManager', () async {
+      when(mock.ensureInitialized)
+          .thenAnswer((_) async => _sampleSnapshotRaw());
+      when(mock.getPlatformInfo).thenAnswer(
+        (_) async => PlatformInfoRaw(target: 'macos', isSandboxed: false),
+      );
+      WindowFlutterApi? capturedAdapter;
+      when(() => mock.registerFlutterApi(any())).thenAnswer((invocation) {
+        capturedAdapter = invocation.positionalArguments[0] as WindowFlutterApi;
+      });
+
+      await WindowManager.instance.ensureInitialized();
+      expect(capturedAdapter, isNotNull);
+
+      // Adapter should forward to WindowManager.onSnapshotChanged.
+      final newSnap = _sampleSnapshotRaw();
+      newSnap.title = 'Updated by adapter';
+      capturedAdapter!.onSnapshotChanged(newSnap);
+      expect(WindowManager.instance.snapshot.value.title, 'Updated by adapter');
     });
   });
 }

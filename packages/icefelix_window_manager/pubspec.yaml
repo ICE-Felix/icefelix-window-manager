@@ -28,6 +28,7 @@ dependencies:
   flutter:
     sdk: flutter
   icefelix_window_manager_platform_interface: ^0.1.0-dev.1
+  meta: ^1.15.0
 
 dev_dependencies:
   flutter_lints: ^5.0.0

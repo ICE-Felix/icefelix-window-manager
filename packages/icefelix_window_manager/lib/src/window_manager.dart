@@ -260,11 +260,22 @@ class WindowManager {
       throw StateError('WindowManager.ensureInitialized() called twice.');
     }
 
+    // Register Flutter API callback adapter BEFORE asking platform to initialize
+    // so events fired during init are not lost.
+    WindowManagerPlatform.instance.registerFlutterApi(_FlutterApiAdapter(this));
+
     final pigeonSnap = await WindowManagerPlatform.instance.ensureInitialized();
     final pigeonInfo = await WindowManagerPlatform.instance.getPlatformInfo();
 
     _platform = _convertPlatformInfo(pigeonInfo);
-    _snapshot._set(_convertSnapshot(pigeonSnap));
+    final snapshot = _convertSnapshot(pigeonSnap);
+    _snapshot._set(snapshot);
+
+    // Fix C2: seed WindowDisplays._lastKnown with the initial display so the
+    // first onDisplaysChanged emission doesn't fire a phantom DisplayAddedEvent
+    // for the already-known display.
+    _displays.seedLastKnown([snapshot.currentDisplay]);
+
     _initialized = true;
   }
 
@@ -479,5 +490,40 @@ class _SnapshotValueNotifier extends ChangeNotifier
   void _set(WindowSnapshot snap) {
     _value = snap;
     notifyListeners();
+  }
+}
+
+/// Internal adapter that implements [WindowFlutterApi] and forwards to
+/// [WindowManager] callbacks. Registered with the platform during
+/// [WindowManager.ensureInitialized] so native impls can send events back.
+class _FlutterApiAdapter implements WindowFlutterApi {
+  _FlutterApiAdapter(this._manager);
+
+  final WindowManager _manager;
+
+  @override
+  void onSnapshotChanged(WindowSnapshotRaw snapshot) =>
+      _manager.onSnapshotChanged(snapshot);
+
+  @override
+  void onDisplaysChanged(List<DisplayRaw> displays) =>
+      _manager.onDisplaysChanged(displays);
+
+  /// Pigeon-generated [WindowFlutterApi.onCloseRequest] is synchronous (returns
+  /// `bool`). [WindowManager.onCloseRequest] is `Future<bool>` because it
+  /// yields a microtask for async listeners. We bridge by ignoring the future
+  /// here — broadcast StreamController.add delivers synchronously to direct
+  /// listeners, so any synchronous `preventDefault()` is honoured before we
+  /// read `_closeRequestBlocked` via the manager's private flag flow.
+  @override
+  bool onCloseRequest() {
+    // Fire & forget the async flow — the synchronous parts (event dispatch +
+    // sync preventDefault) complete inline before this returns.
+    final pending = _manager.onCloseRequest();
+    // Track but don't await — Future is consumed downstream; outcome surfaces
+    // through subsequent calls. For sync determination, mirror the manager's
+    // semantics: not-blocked → allow.
+    pending.ignore();
+    return !_manager._closeRequestBlocked;
   }
 }

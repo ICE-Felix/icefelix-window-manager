@@ -10,6 +10,15 @@ class MockWindowManagerPlatform extends Mock
     with MockPlatformInterfaceMixin
     implements WindowManagerPlatform {}
 
+class _FakeWindowFlutterApi implements WindowFlutterApi {
+  @override
+  void onSnapshotChanged(WindowSnapshotRaw snapshot) {}
+  @override
+  void onDisplaysChanged(List<DisplayRaw> displays) {}
+  @override
+  bool onCloseRequest() => true;
+}
+
 DisplayRaw _displayA() => DisplayRaw(
       id: 'm1',
       name: 'A',
@@ -69,6 +78,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(SizeRaw(width: 0, height: 0));
     registerFallbackValue(OffsetRaw(dx: 0, dy: 0));
+    registerFallbackValue(_FakeWindowFlutterApi());
   });
 
   setUp(() async {
@@ -121,20 +131,22 @@ void main() {
       final events = <DisplayEvent>[];
       final sub = WindowManager.instance.displays.events.listen(events.add);
 
-      // Initial: only displayA known (set during ensureInitialized via snapshot.currentDisplay).
-      // Actually, WindowDisplays starts empty until first onDisplaysChanged.
+      // After C2: ensureInitialized seeded lastKnown with snapshot.currentDisplay
+      // (m1), so this first call with just [m1] should emit ZERO Added events.
       WindowManager.instance.debugSimulateDisplaysChanged([_displayA()]);
       await Future<void>.delayed(Duration.zero);
-
-      // First call: all are "added" since lastKnown was empty.
-      expect(events.whereType<DisplayAddedEvent>().length, 1);
+      expect(
+        events.whereType<DisplayAddedEvent>().length,
+        0,
+        reason: 'Initial primary display should be seeded, not re-emitted',
+      );
 
       events.clear();
       WindowManager.instance
           .debugSimulateDisplaysChanged([_displayA(), _displayB()]);
       await Future<void>.delayed(Duration.zero);
 
-      // Second call: m2 is new.
+      // m2 is genuinely new.
       expect(events.length, 1);
       expect(events.first, isA<DisplayAddedEvent>());
       expect(
@@ -296,6 +308,40 @@ void main() {
           await WindowManager.instance.debugSimulateCloseRequest();
 
       expect(shouldClose, isTrue); // no preventDefault → allow
+
+      await sub.cancel();
+    });
+  });
+
+  group('WindowDisplays seeding (W1.1 patch C2)', () {
+    test(
+        'ensureInitialized seeds lastKnown with initial display so no '
+        'phantom Added event fires for the initial display', () async {
+      final events = <DisplayEvent>[];
+      final sub = WindowManager.instance.displays.events.listen(events.add);
+
+      // Simulate native sending the initial display list (which contains the
+      // same primary display already in snapshot.currentDisplay).
+      WindowManager.instance.debugSimulateDisplaysChanged([_displayA()]);
+      await Future<void>.delayed(Duration.zero);
+
+      // BEFORE C2 fix: this would emit DisplayAddedEvent for m1 (phantom).
+      // AFTER C2 fix: no event because m1 is already in seeded lastKnown.
+      expect(
+        events.whereType<DisplayAddedEvent>().length,
+        0,
+        reason: 'Initial primary display should be seeded, not re-emitted',
+      );
+
+      // But adding a second display SHOULD still emit Added.
+      WindowManager.instance
+          .debugSimulateDisplaysChanged([_displayA(), _displayB()]);
+      await Future<void>.delayed(Duration.zero);
+      expect(events.whereType<DisplayAddedEvent>().length, 1);
+      expect(
+        (events.first as DisplayAddedEvent).display.id,
+        const DisplayId('m2'),
+      );
 
       await sub.cancel();
     });

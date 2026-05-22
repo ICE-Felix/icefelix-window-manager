@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:icefelix_window_manager_platform_interface/icefelix_window_manager_platform_interface.dart';
+import 'package:meta/meta.dart';
 
 import 'display.dart';
 import 'window_event.dart';
@@ -36,6 +37,14 @@ class WindowDisplays {
 
   /// **Broadcast stream**. Hot-plug aware: connect/disconnect/config-change events.
   Stream<DisplayEvent> get events => _events.stream;
+
+  /// Internal: seed initial known displays so the first [handleDisplaysChanged]
+  /// call doesn't emit phantom Added events for already-known displays.
+  /// Called by [WindowManager.ensureInitialized].
+  @internal
+  void seedLastKnown(List<Display> initial) {
+    _lastKnown = List<Display>.unmodifiable(initial);
+  }
 
   /// Called by [WindowManager] when FlutterApi.onDisplaysChanged fires.
   /// Diff old vs current and emit Added/Removed/Changed events.
