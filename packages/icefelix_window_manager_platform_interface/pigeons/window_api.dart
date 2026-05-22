@@ -149,6 +149,9 @@ enum DisplayServerRaw { x11, wayland }
 
 // ============ HOST API (Dart → native) ============
 
+// NOTE: @ConfigurePigeon is file-level configuration despite being attached to
+// WindowHostApi. Pigeon v22 requires the annotation on a class declaration. If
+// you add a second @HostApi class, DO NOT duplicate this annotation.
 @ConfigurePigeon(
   PigeonOptions(
     dartOut: 'lib/src/messages.g.dart',
@@ -164,12 +167,25 @@ abstract class WindowHostApi {
 
   // Bounds + size + position
   WindowBoundsRaw getBounds();
+
+  /// Set window bounds. Coordinate system depends on [displayId]:
+  /// - If [displayId] is null: bounds.position is in GLOBAL virtual desktop coords.
+  /// - If [displayId] is provided: bounds.position is RELATIVE to that display's origin.
+  ///
+  /// NOTE: distinct from moveToDisplay():
+  /// - setBounds(bounds, displayId) = "set window to specific bounds, optionally on display X"
+  /// - moveToDisplay(displayId) = "move window to display X, preserving current relative position"
+  /// Use setBounds when you have specific coordinates; use moveToDisplay when you just want to switch monitors.
   void setBounds(WindowBoundsRaw bounds, String? displayId);
   void setSize(SizeRaw size);
   void setMinSize(SizeRaw? size);
   void setMaxSize(SizeRaw? size);
   void setPosition(OffsetRaw position);
   void center();
+
+  /// Move window to [displayId], **preserving relative position when possible**.
+  /// If the preserved position doesn't fit on the new display, centers instead.
+  /// Distinct from setBounds(bounds, displayId) — see setBounds for explicit positioning.
   void moveToDisplay(String displayId);
 
   // State
@@ -234,8 +250,15 @@ abstract class WindowFlutterApi {
   /// Called when displays are added, removed, or reconfigured.
   void onDisplaysChanged(List<DisplayRaw> displays);
 
-  /// Called when close is requested + setPreventClose(true).
+  /// Called when close is requested AND setPreventClose(true) was previously called.
   /// Return value: true = allow close (default), false = block.
-  /// Native side waits for this Future to complete before deciding.
+  ///
+  /// SYNCHRONIZATION CONTRACT FOR NATIVE IMPLEMENTATIONS:
+  /// - Native side MUST wait for Dart's response before deciding.
+  /// - Default-allow on timeout: if Dart doesn't respond within 5000ms, treat as `true`
+  ///   (allow close). Rationale: blocking close indefinitely on a hung Dart isolate
+  ///   would prevent user from force-quitting the app.
+  /// - Implementations on macOS/Windows/Linux MUST agree on this timeout to keep
+  ///   behavior consistent across platforms.
   bool onCloseRequest();
 }
