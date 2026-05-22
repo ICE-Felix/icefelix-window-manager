@@ -222,6 +222,10 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
     } else {
       w.contentMinSize = NSSize(width: 0, height: 0)
     }
+    // contentMinSize change may auto-shrink the frame (which fires didResize),
+    // but if the current frame already satisfies the new constraint, no
+    // notification fires — emit explicitly so the Dart snapshot stays in sync.
+    scheduleSnapshotEmit()
   }
 
   func setMaxSize(size: SizeRaw?) throws {
@@ -235,6 +239,7 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
         height: CGFloat.greatestFiniteMagnitude
       )
     }
+    scheduleSnapshotEmit()
   }
 
   func setPosition(position: OffsetRaw) throws {
@@ -500,12 +505,14 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
   func setTitle(title: String) throws {
     let w = try requireWindow()
     w.title = title
+    scheduleSnapshotEmit()
   }
 
   func setAlwaysOnTop(value: Bool) throws {
     let w = try requireWindow()
     alwaysOnTopFlag = value
     w.level = value ? .floating : .normal
+    scheduleSnapshotEmit()
   }
 
   func setSkipTaskbar(value: Bool) throws {
@@ -522,6 +529,7 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
       w.collectionBehavior.remove(.transient)
       w.collectionBehavior.remove(.ignoresCycle)
     }
+    scheduleSnapshotEmit()
   }
 
   func setResizable(value: Bool) throws {
@@ -531,11 +539,13 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
     } else {
       w.styleMask.remove(.resizable)
     }
+    scheduleSnapshotEmit()
   }
 
   func setMovable(value: Bool) throws {
     let w = try requireWindow()
     w.isMovable = value
+    scheduleSnapshotEmit()
   }
 
   func setMinimizable(value: Bool) throws {
@@ -545,6 +555,7 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
     } else {
       w.styleMask.remove(.miniaturizable)
     }
+    scheduleSnapshotEmit()
   }
 
   func setMaximizable(value: Bool) throws {
@@ -552,8 +563,9 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
     // Flag-tracked for now: macOS shows a zoom (maximize) button whenever
     // .resizable is in the styleMask, with no separate "maximizable" bit.
     // True enforcement requires NSWindowDelegate.windowShouldZoom(_:toFrame:)
-    // returning false; that delegate lands in W2.4.
+    // returning false; that delegate lands in v0.2.0.
     maximizableFlag = value
+    scheduleSnapshotEmit()
   }
 
   func setClosable(value: Bool) throws {
@@ -563,6 +575,7 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
     } else {
       w.styleMask.remove(.closable)
     }
+    scheduleSnapshotEmit()
   }
 
   // ============ FRAMELESS + TITLE BAR ============
@@ -580,6 +593,7 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
         w.titlebarAppearsTransparent = false
       }
     }
+    scheduleSnapshotEmit()
   }
 
   func setTitleBarStyle(style: TitleBarStyleRaw) throws {
@@ -601,6 +615,7 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
       w.titleVisibility = .hidden
       w.styleMask.insert(.fullSizeContentView)
     }
+    scheduleSnapshotEmit()
   }
 
   // ============ VISUAL ============
@@ -609,6 +624,7 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
     let w = try requireWindow()
     let clamped = max(0.0, min(1.0, opacity))
     w.alphaValue = CGFloat(clamped)
+    scheduleSnapshotEmit()
   }
 
   func setBackgroundColor(argb: Int64) throws {
@@ -621,11 +637,13 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
     // Opaque windows render via a fast path; transparency demands isOpaque=false
     // so AppKit composites alpha properly.
     w.isOpaque = (a >= 1.0)
+    scheduleSnapshotEmit()
   }
 
   func setHasShadow(value: Bool) throws {
     let w = try requireWindow()
     w.hasShadow = value
+    scheduleSnapshotEmit()
   }
 
   func setIcon(filesystemPath: String) throws {
@@ -639,6 +657,7 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
     }
     // macOS has no per-window icon concept; this sets the app's Dock icon.
     NSApplication.shared.applicationIconImage = img
+    scheduleSnapshotEmit()
   }
 
   // ============ CLOSE INTERCEPTION ============
@@ -647,6 +666,7 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
     // Honored by ForwardingWindowDelegate.windowShouldClose(_:), which the
     // first ensureInitialized() call installs on the host NSWindow.
     preventCloseFlag = value
+    scheduleSnapshotEmit()
   }
 
   // ============ MULTI-MONITOR ============

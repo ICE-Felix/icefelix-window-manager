@@ -56,27 +56,16 @@ void main() {
     );
   });
 
-  // NOTE on snapshot reactivity vs. setters:
-  //   The macOS Swift impl emits `onSnapshotChanged` only when an NSWindow
-  //   notification fires (didResize / didMove / didBecomeKey / didMiniaturize
-  //   / didEnterFullScreen / didChangeScreen). Pure-property setters like
-  //   setTitle / setAlwaysOnTop / setResizable mutate window state without
-  //   triggering any of those notifications, so the Dart-side snapshot never
-  //   refreshes from those calls alone (the next snapshot emit will reflect
-  //   them once a tracked notification fires for any reason).
-  //   Tracked as a follow-up; W2.5 tests only assert that the call completes
-  //   without throwing for those setters.
-  testWidgets('setTitle completes without throwing', (tester) async {
+  testWidgets('setTitle updates snapshot.title', (tester) async {
     await WindowManager.instance.setTitle('Integration Test');
-    // No snapshot assertion — see note above.
+    await waitForSnapshot((s) => s.title == 'Integration Test');
   });
 
-  testWidgets('setAlwaysOnTop true/false completes without throwing', (
-    tester,
-  ) async {
+  testWidgets('setAlwaysOnTop updates snapshot.alwaysOnTop', (tester) async {
     await WindowManager.instance.setAlwaysOnTop(true);
+    await waitForSnapshot((s) => s.alwaysOnTop == true);
     await WindowManager.instance.setAlwaysOnTop(false);
-    // No snapshot assertion — see note above.
+    await waitForSnapshot((s) => s.alwaysOnTop == false);
   });
 
   testWidgets('platform.target == TargetPlatform.macOS', (tester) async {

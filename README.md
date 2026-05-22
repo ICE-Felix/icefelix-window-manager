@@ -6,11 +6,11 @@ Cross-platform window management for Flutter desktop — macOS, Windows, Linux (
 
 ## Status
 
-- ✅ **W1: Dart foundation + Pigeon schema (2026-05-22)** — all Dart-side API + 69 unit tests
-- ⏳ W2: macOS native impl (Swift + AppKit)
+- ✅ **W1: Dart foundation + Pigeon schema (2026-05-22)** — all Dart-side API + 71 unit tests
+- ✅ **W2: macOS native impl (2026-05-22)** — Swift + AppKit, 7 integration tests, comprehensive testbed app
 - ⏳ W3: Windows native impl (C++ + Win32)
 - ⏳ W4: Linux native impl (C++ + GTK + libdecor for Wayland)
-- ⏳ W5: Example app + 5+ scenarios + launch
+- ⏳ W5: 5+ scenario example + launch
 
 ## Packages
 
