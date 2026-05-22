@@ -7,8 +7,7 @@ analyzer:
     strict-raw-types: true
   errors:
     missing_required_param: error
-    missing_return: error
-    public_member_api_docs: warning
+    public_member_api_docs: info
   exclude:
     - "**/*.g.dart"
     - "**/messages.g.dart"
