@@ -156,6 +156,8 @@ enum DisplayServerRaw { x11, wayland }
   PigeonOptions(
     dartOut: 'lib/src/messages.g.dart',
     dartOptions: DartOptions(),
+    swiftOut: '../icefelix_window_manager_macos/macos/Classes/Messages.g.swift',
+    swiftOptions: SwiftOptions(),
     copyrightHeader: 'pigeons/copyright.txt',
   ),
 )
