@@ -1,0 +1,22 @@
+PODS:
+  - FlutterMacOS (1.0.0)
+  - icefelix_window_manager_macos (0.1.0):
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - icefelix_window_manager_macos (from `Flutter/ephemeral/.symlinks/plugins/icefelix_window_manager_macos/macos`)
+
+EXTERNAL SOURCES:
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  icefelix_window_manager_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/icefelix_window_manager_macos/macos
+
+SPEC CHECKSUMS:
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  icefelix_window_manager_macos: 4138ac439790a273ed4797670b2747416e140087
+
+PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
+
+COCOAPODS: 1.16.2

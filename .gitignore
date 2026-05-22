@@ -26,3 +26,19 @@ packages/**/doc/
 
 # Logs
 *.log
+
+# Example app build artifacts (Pods, build/, etc.)
+packages/**/example/build/
+packages/**/example/.flutter-plugins
+packages/**/example/.flutter-plugins-dependencies
+packages/**/example/ios/Pods/
+packages/**/example/macos/Pods/
+packages/**/example/macos/Flutter/ephemeral/
+packages/**/example/macos/Flutter/GeneratedPluginRegistrant.swift
+packages/**/example/macos/Runner.xcworkspace/xcuserdata/
+packages/**/example/macos/Runner.xcodeproj/xcuserdata/
+packages/**/example/macos/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+packages/**/example/.dart_tool/
+packages/**/example/ios/Flutter/flutter_export_environment.sh
+packages/**/example/ios/Flutter/Generated.xcconfig
+packages/**/example/macos/Flutter/flutter_export_environment.sh
