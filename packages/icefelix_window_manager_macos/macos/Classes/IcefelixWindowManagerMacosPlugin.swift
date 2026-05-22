@@ -4,9 +4,9 @@ import Cocoa
 import FlutterMacOS
 
 /// Plugin registration entry point. Wires WindowHostApi to a real NSWindow
-/// implementation. W2.2 covers bounds, state machine, focus, and lifecycle.
-/// Drag/resize, title/properties/visual, frameless, multi-monitor and
-/// FlutterApi event emission land in W2.3 / W2.4.
+/// implementation. W2.2 covered bounds, state machine, focus, and lifecycle;
+/// W2.3 adds drag/resize, title/properties/visual, and frameless. Multi-monitor
+/// and FlutterApi event emission land in W2.4.
 public class IcefelixWindowManagerMacosPlugin: NSObject, FlutterPlugin {
   public static func register(with registrar: FlutterPluginRegistrar) {
     let messenger = registrar.messenger
@@ -51,8 +51,8 @@ extension NSWindow {
 /// Real WindowHostApi implementation backed by NSWindow + AppKit.
 ///
 /// Scope coverage:
-/// - W2.2 (this file): init, bounds, state machine, focus, lifecycle.
-/// - W2.3: drag/resize, title/properties, frameless, visual.
+/// - W2.2: init, bounds, state machine, focus, lifecycle.
+/// - W2.3 (this file): drag/resize, title/properties, frameless, visual.
 /// - W2.4: multi-monitor (listDisplays/getCurrentDisplay/getPrimaryDisplay,
 ///   moveToDisplay, proper DisplayRaw conversion) + FlutterApi event emission
 ///   + close-request interception via NSWindowDelegate.
@@ -62,6 +62,19 @@ class WindowHostApiImpl: WindowHostApi {
   /// W2.2: just stored. W2.4 wires NSWindowDelegate.windowShouldClose: to
   /// fire FlutterApi.onCloseRequest and block the close until Dart responds.
   private var preventCloseFlag = false
+
+  /// Flags for properties that aren't directly introspectable from NSWindow
+  /// state. Real platform-state introspection arrives in W2.4 once
+  /// NSWindowDelegate hooks are wired.
+  private var alwaysOnTopFlag = false
+  private var skipTaskbarFlag = false
+  private var maximizableFlag = true
+  private var titleBarStyleFlag: TitleBarStyleRaw = .normal
+
+  /// Active local NSEvent monitor for manual window resize. macOS lacks a
+  /// public performResize-from-edge API, so we install a temporary monitor
+  /// that tracks mouse drags + computes new frames until mouse-up.
+  private var activeResizeMonitor: Any?
 
   init(registrar: FlutterPluginRegistrar) {
     self.registrar = registrar
@@ -87,7 +100,7 @@ class WindowHostApiImpl: WindowHostApi {
 
   private func todo(_ method: String) -> Never {
     fatalError(
-      "icefelix_window_manager_macos: \(method) — not implemented yet (W2.3/W2.4 pending)"
+      "icefelix_window_manager_macos: \(method) — not implemented yet (W2.4 pending)"
     )
   }
 
@@ -270,10 +283,112 @@ class WindowHostApiImpl: WindowHostApi {
     NSApplication.shared.deactivate()
   }
 
-  // ============ DRAG + RESIZE (W2.3) ============
+  // ============ DRAG + RESIZE ============
 
-  func startDrag() throws { todo("startDrag (W2.3)") }
-  func startResize(direction: ResizeDirectionRaw) throws { todo("startResize (W2.3)") }
+  func startDrag() throws {
+    let w = try requireWindow()
+    // Prefer the current event when invoked from inside a real mouse-down
+    // dispatch (e.g. a Flutter pointer handler driven by AppKit); fall back
+    // to a synthesized leftMouseDown event for programmatic callers.
+    if let evt = NSApp.currentEvent, evt.type == .leftMouseDown {
+      w.performDrag(with: evt)
+      return
+    }
+    let loc = NSEvent.mouseLocation
+    if let evt = NSEvent.mouseEvent(
+      with: .leftMouseDown,
+      location: loc,
+      modifierFlags: [],
+      timestamp: ProcessInfo.processInfo.systemUptime,
+      windowNumber: w.windowNumber,
+      context: nil,
+      eventNumber: 0,
+      clickCount: 1,
+      pressure: 1.0
+    ) {
+      w.performDrag(with: evt)
+    }
+  }
+
+  func startResize(direction: ResizeDirectionRaw) throws {
+    let w = try requireWindow()
+    startManualResize(window: w, direction: direction)
+  }
+
+  /// Installs a local NSEvent monitor that tracks `.leftMouseDragged` events
+  /// and updates the window frame per the requested resize direction until
+  /// `.leftMouseUp`. Coordinates are in AppKit space (bottom-left origin) —
+  /// `window.setFrame` takes AppKit coords directly so no Flutter-coord flip
+  /// is needed here.
+  private func startManualResize(window: NSWindow, direction: ResizeDirectionRaw) {
+    // Cancel any in-flight resize before starting a new one.
+    if let m = activeResizeMonitor {
+      NSEvent.removeMonitor(m)
+      activeResizeMonitor = nil
+    }
+
+    let startFrame = window.frame
+    let startMouse = NSEvent.mouseLocation
+    let minW: CGFloat = max(window.contentMinSize.width, 100)
+    let minH: CGFloat = max(window.contentMinSize.height, 100)
+
+    activeResizeMonitor = NSEvent.addLocalMonitorForEvents(
+      matching: [.leftMouseDragged, .leftMouseUp]
+    ) { [weak self] event in
+      guard let self = self else { return event }
+
+      if event.type == .leftMouseUp {
+        if let m = self.activeResizeMonitor {
+          NSEvent.removeMonitor(m)
+          self.activeResizeMonitor = nil
+        }
+        return event
+      }
+
+      let currentMouse = NSEvent.mouseLocation
+      let dx = currentMouse.x - startMouse.x
+      let dy = currentMouse.y - startMouse.y
+
+      var newFrame = startFrame
+      switch direction {
+      case .top:
+        newFrame.size.height = max(minH, startFrame.size.height + dy)
+      case .bottom:
+        let newHeight = max(minH, startFrame.size.height - dy)
+        newFrame.size.height = newHeight
+        newFrame.origin.y = startFrame.origin.y + (startFrame.size.height - newHeight)
+      case .left:
+        let newWidth = max(minW, startFrame.size.width - dx)
+        newFrame.size.width = newWidth
+        newFrame.origin.x = startFrame.origin.x + (startFrame.size.width - newWidth)
+      case .right:
+        newFrame.size.width = max(minW, startFrame.size.width + dx)
+      case .topLeft:
+        let newWidth = max(minW, startFrame.size.width - dx)
+        newFrame.size.width = newWidth
+        newFrame.origin.x = startFrame.origin.x + (startFrame.size.width - newWidth)
+        newFrame.size.height = max(minH, startFrame.size.height + dy)
+      case .topRight:
+        newFrame.size.width = max(minW, startFrame.size.width + dx)
+        newFrame.size.height = max(minH, startFrame.size.height + dy)
+      case .bottomLeft:
+        let newWidth = max(minW, startFrame.size.width - dx)
+        newFrame.size.width = newWidth
+        newFrame.origin.x = startFrame.origin.x + (startFrame.size.width - newWidth)
+        let newHeight = max(minH, startFrame.size.height - dy)
+        newFrame.size.height = newHeight
+        newFrame.origin.y = startFrame.origin.y + (startFrame.size.height - newHeight)
+      case .bottomRight:
+        newFrame.size.width = max(minW, startFrame.size.width + dx)
+        let newHeight = max(minH, startFrame.size.height - dy)
+        newFrame.size.height = newHeight
+        newFrame.origin.y = startFrame.origin.y + (startFrame.size.height - newHeight)
+      }
+
+      window.setFrame(newFrame, display: true)
+      return event
+    }
+  }
 
   // ============ LIFECYCLE ============
 
@@ -290,28 +405,151 @@ class WindowHostApiImpl: WindowHostApi {
     w.close()
   }
 
-  // ============ TITLE + PROPERTIES (W2.3) ============
+  // ============ TITLE + PROPERTIES ============
 
-  func setTitle(title: String) throws { todo("setTitle (W2.3)") }
-  func setAlwaysOnTop(value: Bool) throws { todo("setAlwaysOnTop (W2.3)") }
-  func setSkipTaskbar(value: Bool) throws { todo("setSkipTaskbar (W2.3)") }
-  func setResizable(value: Bool) throws { todo("setResizable (W2.3)") }
-  func setMovable(value: Bool) throws { todo("setMovable (W2.3)") }
-  func setMinimizable(value: Bool) throws { todo("setMinimizable (W2.3)") }
-  func setMaximizable(value: Bool) throws { todo("setMaximizable (W2.3)") }
-  func setClosable(value: Bool) throws { todo("setClosable (W2.3)") }
+  func setTitle(title: String) throws {
+    let w = try requireWindow()
+    w.title = title
+  }
 
-  // ============ FRAMELESS + TITLE BAR (W2.3) ============
+  func setAlwaysOnTop(value: Bool) throws {
+    let w = try requireWindow()
+    alwaysOnTopFlag = value
+    w.level = value ? .floating : .normal
+  }
 
-  func setFrameless(value: Bool) throws { todo("setFrameless (W2.3)") }
-  func setTitleBarStyle(style: TitleBarStyleRaw) throws { todo("setTitleBarStyle (W2.3)") }
+  func setSkipTaskbar(value: Bool) throws {
+    let w = try requireWindow()
+    skipTaskbarFlag = value
+    // macOS has no true taskbar. The closest analog is excluding the window
+    // from Mission Control / window cycling via collectionBehavior. Note this
+    // does NOT hide the app from the Dock — that requires LSUIElement=YES in
+    // Info.plist (a build-time decision, not a per-window runtime toggle).
+    if value {
+      w.collectionBehavior.insert(.transient)
+      w.collectionBehavior.insert(.ignoresCycle)
+    } else {
+      w.collectionBehavior.remove(.transient)
+      w.collectionBehavior.remove(.ignoresCycle)
+    }
+  }
 
-  // ============ VISUAL (W2.3) ============
+  func setResizable(value: Bool) throws {
+    let w = try requireWindow()
+    if value {
+      w.styleMask.insert(.resizable)
+    } else {
+      w.styleMask.remove(.resizable)
+    }
+  }
 
-  func setOpacity(opacity: Double) throws { todo("setOpacity (W2.3)") }
-  func setBackgroundColor(argb: Int64) throws { todo("setBackgroundColor (W2.3)") }
-  func setHasShadow(value: Bool) throws { todo("setHasShadow (W2.3)") }
-  func setIcon(filesystemPath: String) throws { todo("setIcon (W2.3)") }
+  func setMovable(value: Bool) throws {
+    let w = try requireWindow()
+    w.isMovable = value
+  }
+
+  func setMinimizable(value: Bool) throws {
+    let w = try requireWindow()
+    if value {
+      w.styleMask.insert(.miniaturizable)
+    } else {
+      w.styleMask.remove(.miniaturizable)
+    }
+  }
+
+  func setMaximizable(value: Bool) throws {
+    _ = try requireWindow()
+    // Flag-tracked for now: macOS shows a zoom (maximize) button whenever
+    // .resizable is in the styleMask, with no separate "maximizable" bit.
+    // True enforcement requires NSWindowDelegate.windowShouldZoom(_:toFrame:)
+    // returning false; that delegate lands in W2.4.
+    maximizableFlag = value
+  }
+
+  func setClosable(value: Bool) throws {
+    let w = try requireWindow()
+    if value {
+      w.styleMask.insert(.closable)
+    } else {
+      w.styleMask.remove(.closable)
+    }
+  }
+
+  // ============ FRAMELESS + TITLE BAR ============
+
+  func setFrameless(value: Bool) throws {
+    let w = try requireWindow()
+    if value {
+      w.styleMask.remove(.titled)
+      w.titlebarAppearsTransparent = true
+    } else {
+      w.styleMask.insert(.titled)
+      // Only un-transparent the titlebar if the active title-bar style would
+      // normally show it; .hiddenInset keeps the transparent titlebar.
+      if titleBarStyleFlag != .hiddenInset {
+        w.titlebarAppearsTransparent = false
+      }
+    }
+  }
+
+  func setTitleBarStyle(style: TitleBarStyleRaw) throws {
+    let w = try requireWindow()
+    titleBarStyleFlag = style
+    switch style {
+    case .normal:
+      w.titlebarAppearsTransparent = false
+      w.titleVisibility = .visible
+      w.styleMask.remove(.fullSizeContentView)
+    case .hidden:
+      w.titlebarAppearsTransparent = false
+      w.titleVisibility = .hidden
+      w.styleMask.remove(.fullSizeContentView)
+    case .hiddenInset:
+      // Title bar stays present (so traffic lights remain), but content
+      // extends underneath it and the bar itself goes transparent.
+      w.titlebarAppearsTransparent = true
+      w.titleVisibility = .hidden
+      w.styleMask.insert(.fullSizeContentView)
+    }
+  }
+
+  // ============ VISUAL ============
+
+  func setOpacity(opacity: Double) throws {
+    let w = try requireWindow()
+    let clamped = max(0.0, min(1.0, opacity))
+    w.alphaValue = CGFloat(clamped)
+  }
+
+  func setBackgroundColor(argb: Int64) throws {
+    let w = try requireWindow()
+    let a = CGFloat((argb >> 24) & 0xFF) / 255.0
+    let r = CGFloat((argb >> 16) & 0xFF) / 255.0
+    let g = CGFloat((argb >> 8) & 0xFF) / 255.0
+    let b = CGFloat(argb & 0xFF) / 255.0
+    w.backgroundColor = NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    // Opaque windows render via a fast path; transparency demands isOpaque=false
+    // so AppKit composites alpha properly.
+    w.isOpaque = (a >= 1.0)
+  }
+
+  func setHasShadow(value: Bool) throws {
+    let w = try requireWindow()
+    w.hasShadow = value
+  }
+
+  func setIcon(filesystemPath: String) throws {
+    let url = URL(fileURLWithPath: filesystemPath)
+    guard let img = NSImage(contentsOf: url) else {
+      throw PigeonError(
+        code: "invalid_icon_path",
+        message: "Could not load NSImage from \(filesystemPath)",
+        details: nil
+      )
+    }
+    // macOS has no per-window icon concept; this sets the app's Dock icon.
+    NSApplication.shared.applicationIconImage = img
+  }
 
   // ============ CLOSE INTERCEPTION ============
 
@@ -345,18 +583,22 @@ class WindowHostApiImpl: WindowHostApi {
       state: currentWindowState(window),
       title: window.title,
       isFocused: window.isKeyWindow,
-      alwaysOnTop: window.level.rawValue >= NSWindow.Level.floating.rawValue,
-      // macOS doesn't have a direct "skip taskbar" concept; refined in W2.3.
-      skipTaskbar: false,
+      // Prefer the tracked flag; fall back to the live NSWindow level for
+      // windows that were elevated without going through setAlwaysOnTop.
+      alwaysOnTop: alwaysOnTopFlag
+        || window.level.rawValue >= NSWindow.Level.floating.rawValue,
+      // No direct platform read for "skip taskbar" on macOS; mirror the flag
+      // set via setSkipTaskbar.
+      skipTaskbar: skipTaskbarFlag,
       resizable: window.styleMask.contains(.resizable),
       movable: window.isMovable,
       minimizable: window.styleMask.contains(.miniaturizable),
-      // macOS exposes a zoom button when .resizable is set; refined in W2.3.
-      maximizable: true,
+      // No dedicated macOS bit for "maximizable"; mirror the flag set via
+      // setMaximizable. Real enforcement (delegate-driven) lands in W2.4.
+      maximizable: maximizableFlag,
       closable: window.styleMask.contains(.closable),
       frameless: !window.styleMask.contains(.titled),
-      // Refined in W2.3 once setTitleBarStyle is wired.
-      titleBarStyle: .normal,
+      titleBarStyle: titleBarStyleFlag,
       opacity: Double(window.alphaValue),
       backgroundColorArgb: argbFromNSColor(window.backgroundColor),
       hasShadow: window.hasShadow,
