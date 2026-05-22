@@ -2,6 +2,51 @@
 
 All notable changes documented here. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/).
 
+## [0.1.0] - 2026-05-22 — First stable (macOS-only)
+
+First publishable release. macOS implementation complete and audited. Windows
+and Linux implementations are on the roadmap (v0.2.x / v0.3.x).
+
+### Added
+- **App-facing API** (`icefelix_window_manager`): `WindowManager` singleton
+  with `ensureInitialized()`, `ValueListenable<WindowSnapshot>` as single
+  source of truth, full setter surface (bounds, state, focus, drag/resize,
+  lifecycle, title, properties, frameless, visual, close interception),
+  `WindowDisplays` sub-namespace with hot-plug events, `WindowPlatform`
+  runtime introspection, sealed `WindowEvent` + `DisplayEvent` hierarchies,
+  `WindowCloseRequestEvent.preventDefault()`.
+- **Platform interface** (`icefelix_window_manager_platform_interface`):
+  Pigeon schema (42 HostApi methods + 3 FlutterApi callbacks), generated
+  Dart bindings, abstract `WindowManagerPlatform` with `PlatformInterface`
+  token.
+- **macOS impl** (`icefelix_window_manager_macos`): Swift + AppKit, full
+  NSWindow coverage, multi-monitor via CGDirectDisplayID, 10 ms event
+  coalescing, `ForwardingWindowDelegate` preserving Flutter's delegate while
+  intercepting `windowShouldClose:`.
+
+### Fixed (vs. internal dev.3)
+- **Size coordinate alignment**: `setMinSize` and `setMaxSize` now operate
+  in frame coordinates (using `NSWindow.minSize`/`maxSize`), matching
+  `setSize` / `setBounds` / `snapshot.bounds.size`. Previous internal builds
+  used `contentMinSize`/`contentMaxSize`, causing a ~28px asymmetry on
+  styles with a titlebar — `setMaxSize(1200, 900)` followed by `maximize()`
+  produced a 1200×928 frame. Now respects the bound exactly. Internal
+  `startManualResize` clamp aligned to the same coord space.
+
+### Tests
+- 74 unit tests across the Dart packages (snapshot, events, displays,
+  platform introspection, manager wiring)
+- 9 integration tests on real macOS, including 2 contract tests for the
+  size-coordinate alignment fix above
+
+### Known limitations
+- macOS only on v0.1.x. Windows planned for v0.2.x, Linux (X11 + Wayland
+  via libdecor) for v0.3.x.
+- `setBackgroundColor` is only visible when the Flutter widget tree leaves
+  pixels transparent or when the window opacity is below 1.0 — this is
+  standard NSWindow behavior (`isOpaque` is computed from the color's
+  alpha channel), not a plugin limitation.
+
 ## [0.1.0-dev.3] - 2026-05-22 — W2 macOS native impl complete
 
 ### Added

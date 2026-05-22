@@ -88,4 +88,44 @@ void main() {
     await WindowManager.instance.restore();
     await waitForSnapshot((s) => s.state == WindowState.normal);
   });
+
+  // Contract: setSize, setMinSize, setMaxSize, and snapshot.bounds.size all
+  // operate on the same coordinate space (frame, including titlebar). Before
+  // the alignment fix, setMin/MaxSize used contentMin/MaxSize while setSize
+  // and snapshot used frame — causing maximize() to overshoot by ~28px.
+  testWidgets('setMaxSize is honored by maximize() in frame coords', (
+    tester,
+  ) async {
+    await WindowManager.instance.setMaxSize(null); // clear residual constraint
+    await WindowManager.instance.setMinSize(null);
+    await WindowManager.instance.setMaxSize(const Size(1200, 900));
+    await WindowManager.instance.maximize();
+    await waitForSnapshot((s) => s.state == WindowState.maximized);
+    final snap = WindowManager.instance.snapshot.value;
+    expect(
+      snap.bounds.size.width,
+      lessThanOrEqualTo(1200),
+      reason: 'maximize() must not exceed setMaxSize width',
+    );
+    expect(
+      snap.bounds.size.height,
+      lessThanOrEqualTo(900),
+      reason: 'maximize() must not exceed setMaxSize height',
+    );
+    await WindowManager.instance.unmaximize();
+    await waitForSnapshot((s) => s.state == WindowState.normal);
+    await WindowManager.instance.setMaxSize(null);
+  });
+
+  testWidgets('setMinSize clamps subsequent setSize in frame coords', (
+    tester,
+  ) async {
+    await WindowManager.instance.setMinSize(const Size(800, 600));
+    await WindowManager.instance.setSize(const Size(400, 300));
+    // Snapshot.bounds.size (frame) must be at least minSize (also frame).
+    await waitForSnapshot(
+      (s) => s.bounds.size.width >= 800 && s.bounds.size.height >= 600,
+    );
+    await WindowManager.instance.setMinSize(null);
+  });
 }

@@ -495,8 +495,17 @@ protocol WindowHostApi {
   /// - moveToDisplay(displayId) = "move window to display X, preserving current relative position"
   /// Use setBounds when you have specific coordinates; use moveToDisplay when you just want to switch monitors.
   func setBounds(bounds: WindowBoundsRaw, displayId: String?) throws
+  /// Set the window frame size (titlebar included on platforms that have one).
+  /// All size APIs and snapshot.bounds.size share this frame-based coordinate
+  /// space. Top-left position is preserved.
   func setSize(size: SizeRaw) throws
+  /// Set minimum window frame size, or `null` to clear the constraint.
+  /// Coordinate space matches [setSize] — same frame, including titlebar.
+  /// Future drag-resize and `setSize` calls clamp against this bound.
   func setMinSize(size: SizeRaw?) throws
+  /// Set maximum window frame size, or `null` to clear the constraint.
+  /// Coordinate space matches [setSize] — same frame, including titlebar.
+  /// `maximize()` (a.k.a. zoom) also respects this bound.
   func setMaxSize(size: SizeRaw?) throws
   func setPosition(position: OffsetRaw) throws
   func center() throws
@@ -607,6 +616,9 @@ class WindowHostApiSetup {
     } else {
       setBoundsChannel.setMessageHandler(nil)
     }
+    /// Set the window frame size (titlebar included on platforms that have one).
+    /// All size APIs and snapshot.bounds.size share this frame-based coordinate
+    /// space. Top-left position is preserved.
     let setSizeChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setSize\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       setSizeChannel.setMessageHandler { message, reply in
@@ -622,6 +634,9 @@ class WindowHostApiSetup {
     } else {
       setSizeChannel.setMessageHandler(nil)
     }
+    /// Set minimum window frame size, or `null` to clear the constraint.
+    /// Coordinate space matches [setSize] — same frame, including titlebar.
+    /// Future drag-resize and `setSize` calls clamp against this bound.
     let setMinSizeChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setMinSize\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       setMinSizeChannel.setMessageHandler { message, reply in
@@ -637,6 +652,9 @@ class WindowHostApiSetup {
     } else {
       setMinSizeChannel.setMessageHandler(nil)
     }
+    /// Set maximum window frame size, or `null` to clear the constraint.
+    /// Coordinate space matches [setSize] — same frame, including titlebar.
+    /// `maximize()` (a.k.a. zoom) also respects this bound.
     let setMaxSizeChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setMaxSize\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       setMaxSizeChannel.setMessageHandler { message, reply in
