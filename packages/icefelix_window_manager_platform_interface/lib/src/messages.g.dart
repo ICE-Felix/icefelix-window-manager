@@ -560,6 +560,14 @@ class WindowHostApi {
     }
   }
 
+  /// Set window bounds. Coordinate system depends on [displayId]:
+  /// - If [displayId] is null: bounds.position is in GLOBAL virtual desktop coords.
+  /// - If [displayId] is provided: bounds.position is RELATIVE to that display's origin.
+  ///
+  /// NOTE: distinct from moveToDisplay():
+  /// - setBounds(bounds, displayId) = "set window to specific bounds, optionally on display X"
+  /// - moveToDisplay(displayId) = "move window to display X, preserving current relative position"
+  /// Use setBounds when you have specific coordinates; use moveToDisplay when you just want to switch monitors.
   Future<void> setBounds(WindowBoundsRaw bounds, String? displayId) async {
     final String pigeonVar_channelName =
         'dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setBounds$pigeonVar_messageChannelSuffix';
@@ -704,6 +712,9 @@ class WindowHostApi {
     }
   }
 
+  /// Move window to [displayId], **preserving relative position when possible**.
+  /// If the preserved position doesn't fit on the new display, centers instead.
+  /// Distinct from setBounds(bounds, displayId) — see setBounds for explicit positioning.
   Future<void> moveToDisplay(String displayId) async {
     final String pigeonVar_channelName =
         'dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.moveToDisplay$pigeonVar_messageChannelSuffix';
@@ -1522,9 +1533,16 @@ abstract class WindowFlutterApi {
   /// Called when displays are added, removed, or reconfigured.
   void onDisplaysChanged(List<DisplayRaw> displays);
 
-  /// Called when close is requested + setPreventClose(true).
+  /// Called when close is requested AND setPreventClose(true) was previously called.
   /// Return value: true = allow close (default), false = block.
-  /// Native side waits for this Future to complete before deciding.
+  ///
+  /// SYNCHRONIZATION CONTRACT FOR NATIVE IMPLEMENTATIONS:
+  /// - Native side MUST wait for Dart's response before deciding.
+  /// - Default-allow on timeout: if Dart doesn't respond within 5000ms, treat as `true`
+  ///   (allow close). Rationale: blocking close indefinitely on a hung Dart isolate
+  ///   would prevent user from force-quitting the app.
+  /// - Implementations on macOS/Windows/Linux MUST agree on this timeout to keep
+  ///   behavior consistent across platforms.
   bool onCloseRequest();
 
   static void setUp(
