@@ -20,8 +20,9 @@ Thumbs.db
 # Coverage
 coverage/
 
-# Generated dartdoc output
-doc/api/
+# Generated dartdoc output (per-package + root)
+doc/
+packages/**/doc/
 
 # Logs
 *.log
