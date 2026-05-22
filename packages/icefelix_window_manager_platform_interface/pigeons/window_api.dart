@@ -1,0 +1,241 @@
+// Copyright 2026 icefelix.com. BSD-3-Clause.
+//
+// Pigeon schema for icefelix_window_manager. Generated bindings:
+// - Dart:  lib/src/messages.g.dart (this package)
+// - Swift: ../../packages/icefelix_window_manager_macos/macos/Classes/messages.g.swift   (W2)
+// - C++:   ../../packages/icefelix_window_manager_windows/windows/messages.g.{h,cpp}     (W3)
+// - C++:   ../../packages/icefelix_window_manager_linux/linux/messages.g.{h,cc}          (W4)
+//
+// For W1, only the Dart output is generated. Native outputs commented out
+// (uncommented in their respective weeks).
+//
+// Naming: all wire-level types use the `Raw` suffix to distinguish from the
+// public Dart domain types created in W1 Tasks 4-7 (WindowSnapshot, Display,
+// WindowBounds, WindowState, TitleBarStyle, etc.). Pigeon v22 forbids the
+// `Pigeon` prefix on classes and enums.
+
+import 'package:pigeon/pigeon.dart';
+
+// ============ DATA TYPES (POD) ============
+
+class OffsetRaw {
+  OffsetRaw({required this.dx, required this.dy});
+  double dx;
+  double dy;
+}
+
+class SizeRaw {
+  SizeRaw({required this.width, required this.height});
+  double width;
+  double height;
+}
+
+class RectRaw {
+  RectRaw({
+    required this.x,
+    required this.y,
+    required this.width,
+    required this.height,
+  });
+  double x;
+  double y;
+  double width;
+  double height;
+}
+
+class WindowBoundsRaw {
+  WindowBoundsRaw({this.position, required this.size});
+  // Nullable: on Wayland, position not exposed by compositor.
+  OffsetRaw? position;
+  SizeRaw size;
+}
+
+class DisplayRaw {
+  DisplayRaw({
+    required this.id,
+    this.name,
+    required this.bounds,
+    required this.workArea,
+    this.physicalWidthMm,
+    this.physicalHeightMm,
+    this.dpi,
+    required this.scaleFactor,
+    required this.isPrimary,
+    this.refreshRate,
+  });
+  String id;
+  String? name;
+  RectRaw bounds;
+  RectRaw workArea;
+  double? physicalWidthMm;
+  double? physicalHeightMm;
+  double? dpi;
+  double scaleFactor;
+  bool isPrimary;
+  int? refreshRate;
+}
+
+class WindowSnapshotRaw {
+  WindowSnapshotRaw({
+    required this.bounds,
+    required this.state,
+    required this.title,
+    required this.isFocused,
+    required this.alwaysOnTop,
+    required this.skipTaskbar,
+    required this.resizable,
+    required this.movable,
+    required this.minimizable,
+    required this.maximizable,
+    required this.closable,
+    required this.frameless,
+    required this.titleBarStyle,
+    required this.opacity,
+    this.backgroundColorArgb,
+    required this.hasShadow,
+    required this.preventClose,
+    required this.currentDisplay,
+  });
+  WindowBoundsRaw bounds;
+  WindowStateRaw state;
+  String title;
+  bool isFocused;
+  bool alwaysOnTop;
+  bool skipTaskbar;
+  bool resizable;
+  bool movable;
+  bool minimizable;
+  bool maximizable;
+  bool closable;
+  bool frameless;
+  TitleBarStyleRaw titleBarStyle;
+  double opacity;
+  int? backgroundColorArgb;
+  bool hasShadow;
+  bool preventClose;
+  DisplayRaw currentDisplay;
+}
+
+class PlatformInfoRaw {
+  PlatformInfoRaw({
+    required this.target,
+    this.displayServer,
+    required this.isSandboxed,
+  });
+  // "macos" | "windows" | "linux" — Pigeon doesn't support TargetPlatform enum.
+  String target;
+  DisplayServerRaw? displayServer;
+  bool isSandboxed;
+}
+
+// ============ ENUMS ============
+
+enum WindowStateRaw { normal, minimized, maximized, fullscreen, hidden }
+
+enum TitleBarStyleRaw { normal, hidden, hiddenInset }
+
+enum ResizeDirectionRaw {
+  top,
+  bottom,
+  left,
+  right,
+  topLeft,
+  topRight,
+  bottomLeft,
+  bottomRight,
+}
+
+enum DisplayServerRaw { x11, wayland }
+
+// ============ HOST API (Dart → native) ============
+
+@ConfigurePigeon(
+  PigeonOptions(
+    dartOut: 'lib/src/messages.g.dart',
+    dartOptions: DartOptions(),
+    copyrightHeader: 'pigeons/copyright.txt',
+  ),
+)
+@HostApi()
+abstract class WindowHostApi {
+  // Initialization
+  WindowSnapshotRaw ensureInitialized();
+  PlatformInfoRaw getPlatformInfo();
+
+  // Bounds + size + position
+  WindowBoundsRaw getBounds();
+  void setBounds(WindowBoundsRaw bounds, String? displayId);
+  void setSize(SizeRaw size);
+  void setMinSize(SizeRaw? size);
+  void setMaxSize(SizeRaw? size);
+  void setPosition(OffsetRaw position);
+  void center();
+  void moveToDisplay(String displayId);
+
+  // State
+  void minimize();
+  void maximize();
+  void unmaximize();
+  void restore();
+  void hide();
+  void show();
+  void fullscreen();
+  void exitFullscreen();
+
+  // Focus
+  void focus();
+  void blur();
+
+  // Drag + resize (frameless essentials)
+  void startDrag();
+  void startResize(ResizeDirectionRaw direction);
+
+  // Lifecycle
+  void close();
+  void destroy();
+
+  // Title + properties
+  void setTitle(String title);
+  void setAlwaysOnTop(bool value);
+  void setSkipTaskbar(bool value);
+  void setResizable(bool value);
+  void setMovable(bool value);
+  void setMinimizable(bool value);
+  void setMaximizable(bool value);
+  void setClosable(bool value);
+
+  // Frameless + title bar
+  void setFrameless(bool value);
+  void setTitleBarStyle(TitleBarStyleRaw style);
+
+  // Visual
+  void setOpacity(double opacity);
+  void setBackgroundColor(int argb);
+  void setHasShadow(bool value);
+  void setIcon(String filesystemPath);
+
+  // Close interception
+  void setPreventClose(bool value);
+
+  // Multi-monitor
+  List<DisplayRaw> listDisplays();
+  DisplayRaw getCurrentDisplay();
+  DisplayRaw getPrimaryDisplay();
+}
+
+// ============ FLUTTER API (native → Dart) ============
+
+@FlutterApi()
+abstract class WindowFlutterApi {
+  /// Called whenever the window snapshot changes. Single notification for all
+  /// state transitions — Dart side derives WindowEvent from snapshot diff.
+  void onSnapshotChanged(WindowSnapshotRaw snapshot);
+
+  /// Called when displays are added, removed, or reconfigured.
+  void onDisplaysChanged(List<DisplayRaw> displays);
+
+  /// Called when close is requested + setPreventClose(true).
+  /// Return value: true = allow close (default), false = block.
+  /// Native side waits for this Future to complete before deciding.
+  bool onCloseRequest();
+}

@@ -32,7 +32,8 @@ scripts:
     packageFilters:
       noPrivate: true
   pigeon:
-    description: Regenerate Pigeon bindings (platform_interface)
+    description: Regenerate Pigeon bindings (platform_interface) and format output
     run: |
       cd packages/icefelix_window_manager_platform_interface && \
-      dart run pigeon --input pigeons/window_api.dart
+      dart run pigeon --input pigeons/window_api.dart && \
+      dart format lib/src/messages.g.dart
