@@ -1,32 +1,24 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 - 2026-05-24
 
-In-progress Win32 implementation of `icefelix_window_manager_platform_interface`
-for Windows 10+. Tracks the macOS reference impl method-for-method.
+First publishable Win32 implementation of `icefelix_window_manager_platform_interface` for Windows 10+.
 
-### Added (so far)
-- Package scaffolded, dependency on shared platform interface wired
-- Pigeon C++ bindings generated from `pigeons/window_api.dart`
-- Plugin entry point (`IcefelixWindowManagerWindowsPluginCApi`) registered
-  via Flutter Windows C API
-- WndProc subclass on the Flutter host HWND, preserving the original proc
-  via `CallWindowProc`, with 10 ms snapshot-emit coalescing
-- Bounds vertical (`ensureInitialized`, `getBounds`, `setBounds`, `setSize`,
-  `setMinSize`/`setMaxSize` via `WM_GETMINMAXINFO` clamping both
-  `ptMaxTrackSize` and `ptMaxSize`, `setPosition`, `center`,
-  `moveToDisplay`, `maximize`, `unmaximize`)
-- Multi-monitor enumeration via `EnumDisplayMonitors`, stable display IDs
-  derived from `MONITORINFOEX.szDevice`
+### Added
+- All 42 `WindowHostApi` methods implemented against Win32 (bounds, state, focus, drag/resize, lifecycle, title, properties, frameless, visual, multi-monitor, close interception)
+- All 3 `WindowFlutterApi` callbacks (`OnSnapshotChanged`, `OnDisplaysChanged`, `OnCloseRequest`) wired through a subclassed WndProc on the Flutter host HWND
+- `WM_GETMINMAXINFO` clamps both `ptMaxTrackSize` and `ptMaxSize` so `ShowWindow(SW_MAXIMIZE)` honors `setMaxSize` — Win32 analog of the macOS contentMaxSize fix
+- 10 ms event coalescing via `SetTimer` + `WM_TIMER` so high-frequency `WM_SIZE` / `WM_MOVE` during drag-resize doesn't flood the Dart isolate
+- `WM_CLOSE` intercept with 5 s default-allow timeout matching the schema's synchronization contract
+- 11 integration tests on real Windows HWND (6 bounds + 3 macOS-port + 2 Win32-specific)
+- Comprehensive example testbed at `example/` exercising every API (27 controls, ported verbatim from macOS for cross-platform visual audit parity)
 
-### Verified
-- 6 integration tests pass on a real Windows HWND (`flutter test
-  integration_test/ -d windows`), including the critical
-  `setMaxSize is honored by maximize() in frame coords` test that catches
-  the `WM_GETMINMAXINFO`-without-`ptMaxSize` overshoot bug.
-
-### Deferred (next session)
-- State machine remainder (`minimize`, `restore`, `hide`/`show`,
-  `fullscreen`/`exitFullscreen`), focus, drag/resize, title/properties,
-  visual (opacity/bg/shadow/icon), close interception, full `FlutterApi`
-  callbacks wiring
+### Known limitations
+- `setBackgroundColor`: Win32 windows draw their own background via `WM_ERASEBKGND` with the class brush; per-window color isn't a first-party API. Flag is tracked in the snapshot for round-trip correctness; visual no-op.
+- `setHasShadow`: only effective for frameless windows (composed via `DwmExtendFrameIntoClientArea`). Framed windows always have the DWM-managed shadow.
+- `setSkipTaskbar`: toggles `WS_EX_TOOLWINDOW` which also hides the window from Alt+Tab.
+- `getPlatformInfo().isSandboxed`: returns `false` always. MSIX/AppContainer detection deferred to v0.1.x.
+- Physical display size (`DisplayRaw.physicalWidthMm`/`physicalHeightMm`) returns null. Reading these requires EDID/WMI parsing which we don't ship.
+- `setIcon`: loads a single size (`LR_DEFAULTSIZE`) and uses it for both `ICON_BIG` and `ICON_SMALL`. Title-bar/taskbar small icons get a software downscale rather than a separate 16×16. Looks fine on modern Windows DPI scaling.
+- `setMovable(false)`: implemented via `WM_NCHITTEST` remap of `HTCAPTION → HTBORDER`. Frameless windows with custom-chrome hit-testing may need a follow-up to also remap `HTMOVE`.
+- `Focus()`: uses the `AttachThreadInput` workaround; if foreground-lock prevention is active, the call is best-effort. Same caveat applies to macOS.
