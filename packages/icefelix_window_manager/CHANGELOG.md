@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 - 2026-05-24
+
+### Added
+- Windows 10+ support via the new `icefelix_window_manager_windows` package (Win32 implementation, full 42-method `WindowHostApi` coverage). See its CHANGELOG for the platform-specific behavior + limitations.
+
+### Changed
+- `pubspec.yaml` `platforms:` now declares `windows:` alongside `macos:`.
+
 ## [0.1.0] - 2026-05-22 — First stable (macOS-only)
 
 App-facing public API for the icefelix_window_manager federated plugin.
