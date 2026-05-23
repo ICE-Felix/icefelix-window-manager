@@ -134,6 +134,14 @@ class WindowHostApiImpl : public WindowHostApi {
   bool closable_flag_ = true;
   bool movable_flag_ = true;
   bool prevent_close_flag_ = false;
+
+  // Close-intercept synchronization. WM_CLOSE handler waits up to 5000ms
+  // for the Dart side to respond via OnCloseRequest (matches the schema's
+  // SYNCHRONIZATION CONTRACT). On timeout: default-allow per contract.
+  static constexpr DWORD kCloseRequestTimeoutMs = 5000;
+  bool close_in_flight_ = false;
+  bool close_allowed_ = true;
+
   bool has_shadow_flag_ = true;
   double opacity_flag_ = 1.0;
   std::optional<int64_t> background_color_argb_flag_;

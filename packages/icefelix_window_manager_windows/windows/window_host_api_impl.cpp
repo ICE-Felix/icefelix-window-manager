@@ -137,6 +137,61 @@ LRESULT WindowHostApiImpl::HandleMessage(HWND hwnd, UINT msg, WPARAM wp,
       }
       return CallOriginal();
 
+    case WM_CLOSE: {
+      if (!prevent_close_flag_ || !flutter_api_) {
+        // No interception requested -> default-allow (fall through to
+        // DefWindowProc which calls DestroyWindow).
+        return CallOriginal();
+      }
+      if (close_in_flight_) {
+        // Re-entrant WM_CLOSE while the outer handler is still pumping for
+        // Dart's response. CallOriginal() here would destroy the window
+        // mid-pump (DefWindowProc dispatches WM_CLOSE -> DestroyWindow),
+        // leaving the outer pump iterating on a stale HWND. Drop the
+        // duplicate -- the outer pump owns the decision and will either
+        // allow (-> CallOriginal at end) or suppress (-> return 0) when
+        // Dart responds or the 5s timeout elapses.
+        return 0;
+      }
+      close_in_flight_ = true;
+      close_allowed_ = true;  // default-allow on timeout per schema
+
+      // shared_ptr<bool> so the captured callbacks survive past our return
+      // in the timeout case -- the Pigeon channel may still invoke them
+      // when Dart responds late, and we'd otherwise have a use-after-scope
+      // on a stack-local bool. close_allowed_ is a member, so writes to it
+      // post-timeout land in `this` (safe -- next close cycle will reset).
+      auto got_response = std::make_shared<bool>(false);
+      ULONGLONG start = GetTickCount64();
+
+      flutter_api_->OnCloseRequest(
+          [this, got_response](bool allow) {
+            close_allowed_ = allow;
+            *got_response = true;
+          },
+          [got_response](const FlutterError&) {
+            // Channel error -> default-allow (don't trap user in window).
+            *got_response = true;
+          });
+
+      // Pump messages until response or 5s timeout so Dart isolate can run.
+      MSG pump_msg;
+      while (!*got_response &&
+             (GetTickCount64() - start) < kCloseRequestTimeoutMs) {
+        if (PeekMessageW(&pump_msg, nullptr, 0, 0, PM_REMOVE)) {
+          TranslateMessage(&pump_msg);
+          DispatchMessageW(&pump_msg);
+        } else {
+          Sleep(1);  // back off when no messages
+        }
+      }
+      close_in_flight_ = false;
+      if (close_allowed_) {
+        return CallOriginal();
+      }
+      return 0;  // suppress close
+    }
+
     default:
       return CallOriginal();
   }
@@ -658,11 +713,17 @@ std::optional<FlutterError> WindowHostApiImpl::StartResize(
 }
 
 std::optional<FlutterError> WindowHostApiImpl::Close() {
-  return FlutterError(kNotImplemented, "Close() not implemented in session 1");
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  // Goes through our WM_CLOSE handler -> respects prevent_close_flag_,
+  // mirrors macOS performClose: which honors windowShouldClose:.
+  PostMessageW(hwnd_, WM_CLOSE, 0, 0);
+  return std::nullopt;
 }
 std::optional<FlutterError> WindowHostApiImpl::Destroy() {
-  return FlutterError(kNotImplemented,
-                      "Destroy() not implemented in session 1");
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  // Bypasses WM_CLOSE -> bypasses prevent_close. Mirrors macOS window.close().
+  DestroyWindow(hwnd_);
+  return std::nullopt;
 }
 
 std::optional<FlutterError> WindowHostApiImpl::SetTitle(const std::string&) {
@@ -726,9 +787,9 @@ std::optional<FlutterError> WindowHostApiImpl::SetIcon(const std::string&) {
 }
 
 std::optional<FlutterError> WindowHostApiImpl::SetPreventClose(bool value) {
-  // Flag tracked so the snapshot reports it; actual close-intercept wiring
-  // (subclass WM_CLOSE, fire OnCloseRequest, default-allow on 5 s timeout)
-  // is session 2.
+  // Honored by the WM_CLOSE case in HandleMessage(): when true, it fires
+  // OnCloseRequest to Dart and waits up to 5 s for a verdict before
+  // proceeding. Default-allow on timeout per the schema's sync contract.
   prevent_close_flag_ = value;
   ScheduleSnapshotEmit();
   return std::nullopt;
