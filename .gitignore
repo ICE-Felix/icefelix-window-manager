@@ -42,3 +42,6 @@ packages/**/example/.dart_tool/
 packages/**/example/ios/Flutter/flutter_export_environment.sh
 packages/**/example/ios/Flutter/Generated.xcconfig
 packages/**/example/macos/Flutter/flutter_export_environment.sh
+
+# Marketing drafts (kept local)
+launch/
