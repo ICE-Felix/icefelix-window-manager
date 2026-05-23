@@ -92,8 +92,8 @@ class _TestbedHomeState extends State<TestbedHome> {
                   child: const Text('center'),
                 ),
                 ElevatedButton(
-                  onPressed: () => WindowManager.instance
-                      .setMaxSize(const Size(1200, 900)),
+                  onPressed: () =>
+                      WindowManager.instance.setMaxSize(const Size(1200, 900)),
                   child: const Text('setMaxSize 1200x900'),
                 ),
                 ElevatedButton(
