@@ -14,7 +14,6 @@ namespace icefelix_window_manager_windows {
 
 namespace {
 
-constexpr const char* kNotImplemented = "not_implemented";
 constexpr const char* kNoWindow = "no_window";
 
 /// Convert a UTF-16 string to UTF-8. Used for window title + monitor names
@@ -105,6 +104,12 @@ LRESULT WindowHostApiImpl::HandleMessage(HWND hwnd, UINT msg, WPARAM wp,
       // ptMaxSize, ShowWindow overshoots the user's bound to the work-area
       // size (the same class of bug the macOS impl hit with contentMaxSize).
       LRESULT r = CallOriginal();
+      // Skip user-supplied min/max while in fullscreen -- a fullscreen
+      // window covers the whole monitor regardless of setMaxSize, and any
+      // later Maximize() call while fullscreen should keep that behavior.
+      if (fullscreen_flag_) {
+        return r;
+      }
       auto* mmi = reinterpret_cast<MINMAXINFO*>(lp);
       if (min_size_set_) {
         mmi->ptMinTrackSize.x = min_size_cx_;
@@ -267,6 +272,41 @@ void WindowHostApiImpl::EmitDisplaysChanged() {
 
 // ============ Snapshot builder ============
 
+void WindowHostApiImpl::ApplyWindowStyle() {
+  if (!hwnd_) return;
+  // Base = WS_OVERLAPPED (always present for a top-level window).
+  LONG style = WS_OVERLAPPED;
+
+  if (frameless_flag_) {
+    // Frameless: only WS_POPUP, no decorations. Setting min/max/closable on
+    // a frameless window is honored at the snapshot/flag level but has no
+    // visible effect (no chrome to disable).
+    style |= WS_POPUP;
+  } else {
+    style |= WS_CAPTION | WS_SYSMENU;
+    if (resizable_flag_) {
+      style |= WS_THICKFRAME;
+    }
+    if (minimizable_flag_) {
+      style |= WS_MINIMIZEBOX;
+    }
+    // Maximizable also requires resizable; Windows draws the maximize box
+    // only when the frame is thick. Combining the two intents here keeps
+    // SetResizable(false) from silently leaving an enabled-but-greyed box.
+    if (maximizable_flag_ && resizable_flag_) {
+      style |= WS_MAXIMIZEBOX;
+    }
+    // kHidden strips the caption back off; kNormal and kHiddenInset keep it.
+    if (title_bar_style_flag_ == TitleBarStyleRaw::kHidden) {
+      style &= ~WS_CAPTION;
+    }
+  }
+
+  SetWindowLongW(hwnd_, GWL_STYLE, style);
+  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+}
+
 void WindowHostApiImpl::ApplyDwmMargins() {
   if (!hwnd_) return;
   // hiddenInset wants a full sheet of glass over the whole client area --
@@ -315,10 +355,9 @@ WindowSnapshotRaw WindowHostApiImpl::BuildSnapshot() {
   int title_len = GetWindowTextW(hwnd_, title_buf, 512);
   std::string title = Utf8FromWide(title_buf, title_len);
 
-  const LONG style = GetWindowLongW(hwnd_, GWL_STYLE);
-  const bool resizable = (style & WS_THICKFRAME) != 0;
-  const bool minimizable = (style & WS_MINIMIZEBOX) != 0;
-  const bool frameless = (style & WS_CAPTION) == 0;
+  const bool resizable = resizable_flag_;
+  const bool minimizable = minimizable_flag_;
+  const bool frameless = frameless_flag_;
   const bool focused = (GetForegroundWindow() == hwnd_);
 
   DisplayRaw current = BuildDisplayRawForCurrent();
@@ -831,16 +870,8 @@ std::optional<FlutterError> WindowHostApiImpl::SetSkipTaskbar(bool value) {
 
 std::optional<FlutterError> WindowHostApiImpl::SetResizable(bool value) {
   if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
-  LONG style = GetWindowLongW(hwnd_, GWL_STYLE);
-  if (value) {
-    style |= WS_THICKFRAME | WS_MAXIMIZEBOX;
-  } else {
-    style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
-  }
-  SetWindowLongW(hwnd_, GWL_STYLE, style);
-  // SWP_FRAMECHANGED forces Windows to recompute the non-client area.
-  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
-               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  resizable_flag_ = value;
+  ApplyWindowStyle();
   ScheduleSnapshotEmit();
   return std::nullopt;
 }
@@ -855,12 +886,8 @@ std::optional<FlutterError> WindowHostApiImpl::SetMovable(bool value) {
 
 std::optional<FlutterError> WindowHostApiImpl::SetMinimizable(bool value) {
   if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
-  LONG style = GetWindowLongW(hwnd_, GWL_STYLE);
-  if (value) style |= WS_MINIMIZEBOX;
-  else style &= ~WS_MINIMIZEBOX;
-  SetWindowLongW(hwnd_, GWL_STYLE, style);
-  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
-               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  minimizable_flag_ = value;
+  ApplyWindowStyle();
   ScheduleSnapshotEmit();
   return std::nullopt;
 }
@@ -868,12 +895,7 @@ std::optional<FlutterError> WindowHostApiImpl::SetMinimizable(bool value) {
 std::optional<FlutterError> WindowHostApiImpl::SetMaximizable(bool value) {
   if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
   maximizable_flag_ = value;
-  LONG style = GetWindowLongW(hwnd_, GWL_STYLE);
-  if (value) style |= WS_MAXIMIZEBOX;
-  else style &= ~WS_MAXIMIZEBOX;
-  SetWindowLongW(hwnd_, GWL_STYLE, style);
-  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
-               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  ApplyWindowStyle();
   ScheduleSnapshotEmit();
   return std::nullopt;
 }
@@ -894,23 +916,8 @@ std::optional<FlutterError> WindowHostApiImpl::SetClosable(bool value) {
 
 std::optional<FlutterError> WindowHostApiImpl::SetFrameless(bool value) {
   if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
-  LONG style = GetWindowLongW(hwnd_, GWL_STYLE);
-  if (value) {
-    // Strip caption + thick frame; keep WS_POPUP-equivalent so the window
-    // remains an OS top-level (taskbar still tracks it unless skipTaskbar
-    // is also set). Mirrors NSWindow.styleMask.remove(.titled).
-    style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX |
-               WS_SYSMENU);
-    style |= WS_POPUP;
-  } else {
-    style &= ~WS_POPUP;
-    style |= WS_OVERLAPPEDWINDOW;
-  }
-  SetWindowLongW(hwnd_, GWL_STYLE, style);
-  // SWP_FRAMECHANGED forces Win32 to recompute non-client geometry; without
-  // it the caption visually persists until the next resize.
-  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
-               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  frameless_flag_ = value;
+  ApplyWindowStyle();
   ScheduleSnapshotEmit();
   return std::nullopt;
 }
@@ -924,21 +931,8 @@ std::optional<FlutterError> WindowHostApiImpl::SetTitleBarStyle(
   // content area). The closest analog is DwmExtendFrameIntoClientArea
   // applied via ApplyDwmMargins() below, which composes with has_shadow_flag_
   // so the two setters don't clobber each other's DWM slot.
-  LONG wstyle = GetWindowLongW(hwnd_, GWL_STYLE);
-  switch (style) {
-    case TitleBarStyleRaw::kNormal:
-    case TitleBarStyleRaw::kHiddenInset:
-      // Both keep the caption (kHiddenInset for the traffic-lights area).
-      wstyle |= WS_CAPTION;
-      break;
-    case TitleBarStyleRaw::kHidden:
-      wstyle &= ~WS_CAPTION;
-      break;
-  }
-  SetWindowLongW(hwnd_, GWL_STYLE, wstyle);
+  ApplyWindowStyle();
   ApplyDwmMargins();
-  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
-               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
   ScheduleSnapshotEmit();
   return std::nullopt;
 }
@@ -1008,6 +1002,7 @@ std::optional<FlutterError> WindowHostApiImpl::SetIcon(
 }
 
 std::optional<FlutterError> WindowHostApiImpl::SetPreventClose(bool value) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
   // Honored by the WM_CLOSE case in HandleMessage(): when true, it fires
   // OnCloseRequest to Dart and waits up to 5 s for a verdict before
   // proceeding. Default-allow on timeout per the schema's sync contract.
