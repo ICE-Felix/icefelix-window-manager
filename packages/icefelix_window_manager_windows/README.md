@@ -30,5 +30,10 @@ package to a Flutter Windows app.
 
 ## Status
 
-In active development. Track progress at
-[ICE-Felix/icefelix-window-manager](https://github.com/ICE-Felix/icefelix-window-manager).
+Production-ready for the published v0.1.0 method surface. See CHANGELOG
+"Known limitations" for the small set of methods that no-op or approximate
+due to Win32 platform constraints.
+
+Tested on Windows 11 25H2 (build 26200) with Visual Studio 2022 17.14 +
+Windows 10 SDK 10.0.26100, Flutter 3.27+ on Dart 3.6+. 11 integration
+tests pass on a real Windows HWND.
