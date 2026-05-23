@@ -55,7 +55,7 @@ class WindowHostApiImpl : public WindowHostApi {
   std::optional<FlutterError> MoveToDisplay(
       const std::string& display_id) override;
 
-  // State (session 1: maximize/unmaximize live, rest stubbed)
+  // State
   std::optional<FlutterError> Minimize() override;
   std::optional<FlutterError> Maximize() override;
   std::optional<FlutterError> Unmaximize() override;
@@ -69,16 +69,16 @@ class WindowHostApiImpl : public WindowHostApi {
   std::optional<FlutterError> Focus() override;
   std::optional<FlutterError> Blur() override;
 
-  // Drag/resize (session 1: stubbed)
+  // Drag/resize
   std::optional<FlutterError> StartDrag() override;
   std::optional<FlutterError> StartResize(
       const ResizeDirectionRaw& direction) override;
 
-  // Lifecycle (session 1: stubbed except close/destroy)
+  // Lifecycle
   std::optional<FlutterError> Close() override;
   std::optional<FlutterError> Destroy() override;
 
-  // Title + properties (session 1: stubbed)
+  // Title + properties
   std::optional<FlutterError> SetTitle(const std::string& title) override;
   std::optional<FlutterError> SetAlwaysOnTop(bool value) override;
   std::optional<FlutterError> SetSkipTaskbar(bool value) override;
@@ -88,19 +88,19 @@ class WindowHostApiImpl : public WindowHostApi {
   std::optional<FlutterError> SetMaximizable(bool value) override;
   std::optional<FlutterError> SetClosable(bool value) override;
 
-  // Frameless + title bar (session 1: stubbed)
+  // Frameless + title bar
   std::optional<FlutterError> SetFrameless(bool value) override;
   std::optional<FlutterError> SetTitleBarStyle(
       const TitleBarStyleRaw& style) override;
 
-  // Visual (session 1: stubbed)
+  // Visual
   std::optional<FlutterError> SetOpacity(double opacity) override;
   std::optional<FlutterError> SetBackgroundColor(int64_t argb) override;
   std::optional<FlutterError> SetHasShadow(bool value) override;
   std::optional<FlutterError> SetIcon(
       const std::string& filesystem_path) override;
 
-  // Close interception (session 1: flag tracked only — wiring deferred)
+  // Close interception
   std::optional<FlutterError> SetPreventClose(bool value) override;
 
   // Multi-monitor
@@ -134,6 +134,15 @@ class WindowHostApiImpl : public WindowHostApi {
   bool closable_flag_ = true;
   bool movable_flag_ = true;
   bool prevent_close_flag_ = false;
+
+  // User-intended state for each style flag. Win32 `GWL_STYLE` is a
+  // single bitfield read-modify-written by ~5 setters; we shadow each
+  // setter's intent here so ApplyWindowStyle() can compose them all into
+  // the final style without inter-setter clobbering (e.g. SetTitleBarStyle
+  // re-adding WS_CAPTION after SetFrameless(true) stripped it).
+  bool frameless_flag_ = false;
+  bool resizable_flag_ = true;
+  bool minimizable_flag_ = true;
 
   // Close-intercept synchronization. WM_CLOSE handler waits up to 5000ms
   // for the Dart side to respond via OnCloseRequest (matches the schema's
@@ -195,6 +204,13 @@ class WindowHostApiImpl : public WindowHostApi {
   /// `setTitleBarStyle` route through here so the two settings compose
   /// instead of clobbering each other's MARGINS write.
   void ApplyDwmMargins();
+
+  /// Composes the effective GWL_STYLE from all saved-intent flags
+  /// (frameless, resizable, minimizable, maximizable, title_bar_style)
+  /// and applies it via SetWindowLongW + SWP_FRAMECHANGED. Routed through
+  /// from every setter that affects window decorations so they don't
+  /// clobber each other's bits.
+  void ApplyWindowStyle();
 };
 
 }  // namespace icefelix_window_manager_windows
