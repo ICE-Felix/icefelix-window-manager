@@ -192,6 +192,19 @@ LRESULT WindowHostApiImpl::HandleMessage(HWND hwnd, UINT msg, WPARAM wp,
       return 0;  // suppress close
     }
 
+    case WM_NCHITTEST: {
+      if (movable_flag_) {
+        return CallOriginal();  // let title-bar drag work normally
+      }
+      // Movable disabled: rewrite HTCAPTION -> HTBORDER so dragging the
+      // title bar doesn't move the window. Mirrors macOS isMovable=false.
+      LRESULT hit = CallOriginal();
+      // TODO(Task 4 — frameless): also remap HTMOVE -> HTBORDER once
+      // custom-chrome WM_NCHITTEST overrides land for frameless windows.
+      if (hit == HTCAPTION) return HTBORDER;
+      return hit;
+    }
+
     default:
       return CallOriginal();
   }
@@ -726,37 +739,113 @@ std::optional<FlutterError> WindowHostApiImpl::Destroy() {
   return std::nullopt;
 }
 
-std::optional<FlutterError> WindowHostApiImpl::SetTitle(const std::string&) {
-  return FlutterError(kNotImplemented,
-                      "SetTitle() not implemented in session 1");
+std::optional<FlutterError> WindowHostApiImpl::SetTitle(const std::string& title) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  std::wstring wide = WideFromUtf8(title);
+  SetWindowTextW(hwnd_, wide.c_str());
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
-std::optional<FlutterError> WindowHostApiImpl::SetAlwaysOnTop(bool) {
-  return FlutterError(kNotImplemented,
-                      "SetAlwaysOnTop() not implemented in session 1");
+
+std::optional<FlutterError> WindowHostApiImpl::SetAlwaysOnTop(bool value) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  always_on_top_flag_ = value;
+  HWND z = value ? HWND_TOPMOST : HWND_NOTOPMOST;
+  SetWindowPos(hwnd_, z, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
-std::optional<FlutterError> WindowHostApiImpl::SetSkipTaskbar(bool) {
-  return FlutterError(kNotImplemented,
-                      "SetSkipTaskbar() not implemented in session 1");
+
+std::optional<FlutterError> WindowHostApiImpl::SetSkipTaskbar(bool value) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  skip_taskbar_flag_ = value;
+  LONG ex = GetWindowLongW(hwnd_, GWL_EXSTYLE);
+  // WS_EX_TOOLWINDOW hides the window from the taskbar AND from the
+  // Alt+Tab switcher (Windows treats tool windows as utility palettes).
+  // Document this side effect in README -- the schema only specifies
+  // taskbar visibility, not Alt+Tab behavior.
+  if (value) {
+    ex |= WS_EX_TOOLWINDOW;
+    ex &= ~WS_EX_APPWINDOW;
+  } else {
+    ex &= ~WS_EX_TOOLWINDOW;
+    ex |= WS_EX_APPWINDOW;
+  }
+  SetWindowLongW(hwnd_, GWL_EXSTYLE, ex);
+  // The taskbar only re-reads WS_EX_TOOLWINDOW/WS_EX_APPWINDOW on the next
+  // show — for visible windows we hide+show to force that. For an already
+  // hidden window we leave it hidden; the flag will take effect when the
+  // user calls show() later. (Without this guard, SetSkipTaskbar on a
+  // hidden window would silently un-hide it.)
+  if (IsWindowVisible(hwnd_)) {
+    ShowWindow(hwnd_, SW_HIDE);
+    ShowWindow(hwnd_, SW_SHOW);
+  }
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
-std::optional<FlutterError> WindowHostApiImpl::SetResizable(bool) {
-  return FlutterError(kNotImplemented,
-                      "SetResizable() not implemented in session 1");
+
+std::optional<FlutterError> WindowHostApiImpl::SetResizable(bool value) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  LONG style = GetWindowLongW(hwnd_, GWL_STYLE);
+  if (value) {
+    style |= WS_THICKFRAME | WS_MAXIMIZEBOX;
+  } else {
+    style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
+  }
+  SetWindowLongW(hwnd_, GWL_STYLE, style);
+  // SWP_FRAMECHANGED forces Windows to recompute the non-client area.
+  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
-std::optional<FlutterError> WindowHostApiImpl::SetMovable(bool) {
-  return FlutterError(kNotImplemented,
-                      "SetMovable() not implemented in session 1");
+
+std::optional<FlutterError> WindowHostApiImpl::SetMovable(bool value) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  // Win32 has no isMovable bit; tracked + enforced via WM_NCHITTEST below.
+  movable_flag_ = value;
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
-std::optional<FlutterError> WindowHostApiImpl::SetMinimizable(bool) {
-  return FlutterError(kNotImplemented,
-                      "SetMinimizable() not implemented in session 1");
+
+std::optional<FlutterError> WindowHostApiImpl::SetMinimizable(bool value) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  LONG style = GetWindowLongW(hwnd_, GWL_STYLE);
+  if (value) style |= WS_MINIMIZEBOX;
+  else style &= ~WS_MINIMIZEBOX;
+  SetWindowLongW(hwnd_, GWL_STYLE, style);
+  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
-std::optional<FlutterError> WindowHostApiImpl::SetMaximizable(bool) {
-  return FlutterError(kNotImplemented,
-                      "SetMaximizable() not implemented in session 1");
+
+std::optional<FlutterError> WindowHostApiImpl::SetMaximizable(bool value) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  maximizable_flag_ = value;
+  LONG style = GetWindowLongW(hwnd_, GWL_STYLE);
+  if (value) style |= WS_MAXIMIZEBOX;
+  else style &= ~WS_MAXIMIZEBOX;
+  SetWindowLongW(hwnd_, GWL_STYLE, style);
+  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
-std::optional<FlutterError> WindowHostApiImpl::SetClosable(bool) {
-  return FlutterError(kNotImplemented,
-                      "SetClosable() not implemented in session 1");
+
+std::optional<FlutterError> WindowHostApiImpl::SetClosable(bool value) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  closable_flag_ = value;
+  HMENU sys = GetSystemMenu(hwnd_, FALSE);
+  if (sys) {
+    EnableMenuItem(sys, SC_CLOSE,
+                   MF_BYCOMMAND | (value ? MF_ENABLED : MF_GRAYED));
+  }
+  // Also affects the "X" button on the title bar (greyed when MF_GRAYED).
+  DrawMenuBar(hwnd_);
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
 
 std::optional<FlutterError> WindowHostApiImpl::SetFrameless(bool) {
