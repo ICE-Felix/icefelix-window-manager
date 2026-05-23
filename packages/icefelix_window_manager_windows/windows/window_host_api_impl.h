@@ -142,6 +142,10 @@ class WindowHostApiImpl : public WindowHostApi {
   bool close_in_flight_ = false;
   bool close_allowed_ = true;
 
+  // Last icon loaded via SetIcon. Destroyed in dtor so we don't leak GDI
+  // handles. nullptr until first SetIcon call.
+  HICON current_icon_ = nullptr;
+
   bool has_shadow_flag_ = true;
   double opacity_flag_ = 1.0;
   std::optional<int64_t> background_color_argb_flag_;
@@ -185,6 +189,12 @@ class WindowHostApiImpl : public WindowHostApi {
   /// from `GetDpiForWindow` which is the Per-Monitor v2 value Windows
   /// reports for the window's current monitor.
   double ScaleFactor() const;
+
+  /// Applies DWM frame extension based on the combined effect of
+  /// title_bar_style_flag_ and has_shadow_flag_. Both `setHasShadow` and
+  /// `setTitleBarStyle` route through here so the two settings compose
+  /// instead of clobbering each other's MARGINS write.
+  void ApplyDwmMargins();
 };
 
 }  // namespace icefelix_window_manager_windows
