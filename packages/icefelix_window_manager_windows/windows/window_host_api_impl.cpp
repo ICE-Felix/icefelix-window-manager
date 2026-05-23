@@ -740,13 +740,33 @@ std::optional<FlutterError> WindowHostApiImpl::Blur() {
 }
 
 std::optional<FlutterError> WindowHostApiImpl::StartDrag() {
-  return FlutterError(kNotImplemented,
-                      "StartDrag() not implemented in session 1");
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  // Standard Win32 idiom: release current capture so the upcoming
+  // SC_MOVE | HTCAPTION simulated message reaches DefWindowProc which
+  // enters the move modal loop.
+  ReleaseCapture();
+  SendMessageW(hwnd_, WM_SYSCOMMAND, SC_MOVE | HTCAPTION, 0);
+  return std::nullopt;
 }
 std::optional<FlutterError> WindowHostApiImpl::StartResize(
-    const ResizeDirectionRaw&) {
-  return FlutterError(kNotImplemented,
-                      "StartResize() not implemented in session 1");
+    const ResizeDirectionRaw& direction) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  // SC_SIZE | <edge code> drops into DefWindowProc's resize modal loop.
+  // Edge codes correspond to WMSZ_* hit-test-style constants.
+  WPARAM edge = SC_SIZE;
+  switch (direction) {
+    case ResizeDirectionRaw::kTop:         edge |= 3; break;  // WMSZ_TOP
+    case ResizeDirectionRaw::kBottom:      edge |= 6; break;  // WMSZ_BOTTOM
+    case ResizeDirectionRaw::kLeft:        edge |= 1; break;  // WMSZ_LEFT
+    case ResizeDirectionRaw::kRight:       edge |= 2; break;  // WMSZ_RIGHT
+    case ResizeDirectionRaw::kTopLeft:     edge |= 4; break;  // WMSZ_TOPLEFT
+    case ResizeDirectionRaw::kTopRight:    edge |= 5; break;  // WMSZ_TOPRIGHT
+    case ResizeDirectionRaw::kBottomLeft:  edge |= 7; break;  // WMSZ_BOTTOMLEFT
+    case ResizeDirectionRaw::kBottomRight: edge |= 8; break;  // WMSZ_BOTTOMRIGHT
+  }
+  ReleaseCapture();
+  SendMessageW(hwnd_, WM_SYSCOMMAND, edge, 0);
+  return std::nullopt;
 }
 
 std::optional<FlutterError> WindowHostApiImpl::Close() {
