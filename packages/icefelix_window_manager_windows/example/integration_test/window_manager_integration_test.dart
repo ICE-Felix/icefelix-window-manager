@@ -118,4 +118,48 @@ void main() {
     );
     await WindowManager.instance.setMinSize(null);
   });
+
+  testWidgets('setTitle updates snapshot.title', (tester) async {
+    await WindowManager.instance.setTitle('Integration Test');
+    await waitForSnapshot((s) => s.title == 'Integration Test');
+  });
+
+  testWidgets('setAlwaysOnTop updates snapshot.alwaysOnTop', (tester) async {
+    await WindowManager.instance.setAlwaysOnTop(true);
+    await waitForSnapshot((s) => s.alwaysOnTop == true);
+    await WindowManager.instance.setAlwaysOnTop(false);
+    await waitForSnapshot((s) => s.alwaysOnTop == false);
+  });
+
+  testWidgets('minimize then restore round-trip', (tester) async {
+    await WindowManager.instance.minimize();
+    await waitForSnapshot((s) => s.state == WindowState.minimized);
+    await WindowManager.instance.restore();
+    await waitForSnapshot((s) => s.state == WindowState.normal);
+  });
+
+  // Windows-specific: confirm the Per-Monitor v2 DPI is reported in the
+  // current display's scaleFactor. Hard to programmatically trigger
+  // WM_DPICHANGED without moving the window across monitors, so we just
+  // verify the read path returns a plausible value.
+  testWidgets('current display scaleFactor matches Per-Monitor v2 DPI', (
+    tester,
+  ) async {
+    final disp = await WindowManager.instance.displays.getCurrent();
+    expect(disp.scaleFactor, greaterThan(0));
+    // Reasonable bounds: 1.0 (96 DPI) to 4.0 (384 DPI / hi-DPI).
+    expect(disp.scaleFactor, lessThanOrEqualTo(4.0));
+  });
+
+  // Windows-specific: setSkipTaskbar toggles WS_EX_TOOLWINDOW which also
+  // hides the window from Alt+Tab (documented Win32 side effect). Verify
+  // the snapshot reflects the flag round-trip.
+  testWidgets('setSkipTaskbar round-trip via snapshot.skipTaskbar', (
+    tester,
+  ) async {
+    await WindowManager.instance.setSkipTaskbar(true);
+    await waitForSnapshot((s) => s.skipTaskbar == true);
+    await WindowManager.instance.setSkipTaskbar(false);
+    await waitForSnapshot((s) => s.skipTaskbar == false);
+  });
 }
