@@ -1,0 +1,26 @@
+name: icefelix_window_manager_windows_example
+description: "Windows testbed + integration tests for icefelix_window_manager_windows."
+publish_to: 'none'
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  cupertino_icons: ^1.0.8
+  flutter:
+    sdk: flutter
+  icefelix_window_manager:
+    path: ../../icefelix_window_manager
+  icefelix_window_manager_windows:
+    path: ../
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
