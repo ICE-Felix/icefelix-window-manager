@@ -274,34 +274,43 @@ void WindowHostApiImpl::EmitDisplaysChanged() {
 
 void WindowHostApiImpl::ApplyWindowStyle() {
   if (!hwnd_) return;
-  // Base = WS_OVERLAPPED (always present for a top-level window).
-  LONG style = WS_OVERLAPPED;
+  // Bits this composer owns. Everything else in GWL_STYLE (notably
+  // WS_VISIBLE, WS_CLIPCHILDREN, WS_CLIPSIBLINGS that Flutter's runner
+  // sets at window-creation time) is preserved -- otherwise a property
+  // toggle here would silently hide the window or alter the Flutter-set
+  // chrome. The previous "compose from WS_OVERLAPPED scratch" version
+  // shipped briefly in v0.2.0 and stripped WS_VISIBLE on every toggle.
+  constexpr LONG kOwnedBits = WS_CAPTION | WS_SYSMENU | WS_THICKFRAME |
+                              WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP;
 
+  LONG composed = 0;
   if (frameless_flag_) {
     // Frameless: only WS_POPUP, no decorations. Setting min/max/closable on
     // a frameless window is honored at the snapshot/flag level but has no
     // visible effect (no chrome to disable).
-    style |= WS_POPUP;
+    composed |= WS_POPUP;
   } else {
-    style |= WS_CAPTION | WS_SYSMENU;
+    composed |= WS_CAPTION | WS_SYSMENU;
     if (resizable_flag_) {
-      style |= WS_THICKFRAME;
+      composed |= WS_THICKFRAME;
     }
     if (minimizable_flag_) {
-      style |= WS_MINIMIZEBOX;
+      composed |= WS_MINIMIZEBOX;
     }
     // Maximizable also requires resizable; Windows draws the maximize box
     // only when the frame is thick. Combining the two intents here keeps
     // SetResizable(false) from silently leaving an enabled-but-greyed box.
     if (maximizable_flag_ && resizable_flag_) {
-      style |= WS_MAXIMIZEBOX;
+      composed |= WS_MAXIMIZEBOX;
     }
     // kHidden strips the caption back off; kNormal and kHiddenInset keep it.
     if (title_bar_style_flag_ == TitleBarStyleRaw::kHidden) {
-      style &= ~WS_CAPTION;
+      composed &= ~WS_CAPTION;
     }
   }
 
+  LONG existing = GetWindowLongW(hwnd_, GWL_STYLE);
+  LONG style = (existing & ~kOwnedBits) | composed;
   SetWindowLongW(hwnd_, GWL_STYLE, style);
   SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
