@@ -114,8 +114,7 @@ void main() {
     await WindowManager.instance.setSize(const Size(400, 300));
     // Snapshot.bounds.size (frame) must be at least minSize (also frame).
     await waitForSnapshot(
-      (s) =>
-          s.bounds.size.width >= 800 - 1 && s.bounds.size.height >= 600 - 1,
+      (s) => s.bounds.size.width >= 800 - 1 && s.bounds.size.height >= 600 - 1,
     );
     await WindowManager.instance.setMinSize(null);
   });

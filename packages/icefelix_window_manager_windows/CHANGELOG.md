@@ -19,6 +19,12 @@ for Windows 10+. Tracks the macOS reference impl method-for-method.
 - Multi-monitor enumeration via `EnumDisplayMonitors`, stable display IDs
   derived from `MONITORINFOEX.szDevice`
 
+### Verified
+- 6 integration tests pass on a real Windows HWND (`flutter test
+  integration_test/ -d windows`), including the critical
+  `setMaxSize is honored by maximize() in frame coords` test that catches
+  the `WM_GETMINMAXINFO`-without-`ptMaxSize` overshoot bug.
+
 ### Deferred (next session)
 - State machine remainder (`minimize`, `restore`, `hide`/`show`,
   `fullscreen`/`exitFullscreen`), focus, drag/resize, title/properties,
