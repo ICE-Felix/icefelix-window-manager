@@ -140,6 +140,13 @@ class WindowHostApiImpl : public WindowHostApi {
   TitleBarStyleRaw title_bar_style_flag_ = TitleBarStyleRaw::kNormal;
   bool fullscreen_flag_ = false;
 
+  // Style + rect snapshot taken when entering fullscreen so ExitFullscreen
+  // can restore the exact pre-fullscreen window state. Mirrors the macOS
+  // toggleFullScreen which AppKit handles internally.
+  LONG pre_fullscreen_style_ = 0;
+  LONG pre_fullscreen_ex_style_ = 0;
+  RECT pre_fullscreen_rect_ = {};
+
   // Snapshot emit coalescing (10 ms, mirrors macOS scheduleSnapshotEmit).
   static constexpr UINT_PTR kSnapshotTimerId = 0xCAFE;
   static constexpr UINT kSnapshotTimerIntervalMs = 10;

@@ -540,27 +540,111 @@ std::optional<FlutterError> WindowHostApiImpl::Restore() {
   return std::nullopt;
 }
 
-// Stubs for session 1 — wired in session 2.
 std::optional<FlutterError> WindowHostApiImpl::Hide() {
-  return FlutterError(kNotImplemented, "Hide() not implemented in session 1");
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  ShowWindow(hwnd_, SW_HIDE);
+  // SW_HIDE on an already-inactive window fires neither WM_ACTIVATE nor
+  // WM_SIZE, so the snapshot pipeline wouldn't otherwise emit. Force it.
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
+
 std::optional<FlutterError> WindowHostApiImpl::Show() {
-  return FlutterError(kNotImplemented, "Show() not implemented in session 1");
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  // SW_SHOW alone doesn't deminiaturize. Mirror macOS makeKeyAndOrderFront
+  // semantics: if minimized, restore (which also makes visible); otherwise
+  // just show. This avoids the un-maximize side effect of SW_RESTORE on
+  // already-maximized windows.
+  if (IsIconic(hwnd_)) {
+    ShowWindow(hwnd_, SW_RESTORE);
+  } else {
+    ShowWindow(hwnd_, SW_SHOW);
+  }
+  SetForegroundWindow(hwnd_);
+  return std::nullopt;
 }
+
 std::optional<FlutterError> WindowHostApiImpl::Fullscreen() {
-  return FlutterError(kNotImplemented,
-                      "Fullscreen() not implemented in session 1");
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  if (fullscreen_flag_) return std::nullopt;  // idempotent
+
+  pre_fullscreen_style_ = GetWindowLongW(hwnd_, GWL_STYLE);
+  pre_fullscreen_ex_style_ = GetWindowLongW(hwnd_, GWL_EXSTYLE);
+  GetWindowRect(hwnd_, &pre_fullscreen_rect_);
+
+  // Strip WS_OVERLAPPEDWINDOW so the title bar + borders disappear, then
+  // resize to the FULL monitor bounds (not work area — true fullscreen).
+  SetWindowLongW(hwnd_, GWL_STYLE, pre_fullscreen_style_ & ~WS_OVERLAPPEDWINDOW);
+  SetWindowLongW(hwnd_, GWL_EXSTYLE,
+                 pre_fullscreen_ex_style_ & ~(WS_EX_DLGMODALFRAME |
+                                              WS_EX_WINDOWEDGE |
+                                              WS_EX_CLIENTEDGE |
+                                              WS_EX_STATICEDGE));
+  HMONITOR mon = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO mi = {};
+  mi.cbSize = sizeof(mi);
+  GetMonitorInfo(mon, &mi);
+  SetWindowPos(hwnd_, HWND_TOP,
+               mi.rcMonitor.left, mi.rcMonitor.top,
+               mi.rcMonitor.right - mi.rcMonitor.left,
+               mi.rcMonitor.bottom - mi.rcMonitor.top,
+               SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+  fullscreen_flag_ = true;
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
+
 std::optional<FlutterError> WindowHostApiImpl::ExitFullscreen() {
-  return FlutterError(kNotImplemented,
-                      "ExitFullscreen() not implemented in session 1");
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  if (!fullscreen_flag_) return std::nullopt;
+
+  SetWindowLongW(hwnd_, GWL_STYLE, pre_fullscreen_style_);
+  SetWindowLongW(hwnd_, GWL_EXSTYLE, pre_fullscreen_ex_style_);
+  // pre_fullscreen_rect_ was captured in the monitor the window lived on
+  // when Fullscreen() was called. If MoveToDisplay() was invoked while
+  // fullscreen, ExitFullscreen will teleport the window back to that
+  // original monitor. Matches AppKit toggleFullScreen behavior — fix
+  // tracked if it causes real-world UX issues.
+  SetWindowPos(hwnd_, nullptr,
+               pre_fullscreen_rect_.left, pre_fullscreen_rect_.top,
+               pre_fullscreen_rect_.right - pre_fullscreen_rect_.left,
+               pre_fullscreen_rect_.bottom - pre_fullscreen_rect_.top,
+               SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+  fullscreen_flag_ = false;
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
 
 std::optional<FlutterError> WindowHostApiImpl::Focus() {
-  return FlutterError(kNotImplemented, "Focus() not implemented in session 1");
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  // SetForegroundWindow is anti-focus-stealing-restricted on Windows; the
+  // AttachThreadInput dance below works around that for foreground apps.
+  // Mirrors what NSApplication.activate(ignoringOtherApps:true) achieves on macOS.
+  DWORD fg_thread = GetWindowThreadProcessId(GetForegroundWindow(), nullptr);
+  DWORD self_thread = GetCurrentThreadId();
+  if (fg_thread && fg_thread != self_thread) {
+    AttachThreadInput(fg_thread, self_thread, TRUE);
+    BringWindowToTop(hwnd_);
+    SetForegroundWindow(hwnd_);
+    AttachThreadInput(fg_thread, self_thread, FALSE);
+  } else {
+    SetForegroundWindow(hwnd_);
+  }
+  return std::nullopt;
 }
+
 std::optional<FlutterError> WindowHostApiImpl::Blur() {
-  return FlutterError(kNotImplemented, "Blur() not implemented in session 1");
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  // Win32 has no native "blur me" call. Closest parity with macOS's
+  // NSApplication.deactivate(): hand focus to the next top-level window.
+  HWND next = GetNextWindow(hwnd_, GW_HWNDNEXT);
+  while (next && (!IsWindowVisible(next) || GetWindow(next, GW_OWNER) != nullptr)) {
+    next = GetNextWindow(next, GW_HWNDNEXT);
+  }
+  if (next) {
+    SetForegroundWindow(next);
+  }
+  return std::nullopt;
 }
 
 std::optional<FlutterError> WindowHostApiImpl::StartDrag() {
