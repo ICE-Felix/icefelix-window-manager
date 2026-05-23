@@ -3,6 +3,7 @@
 #include "window_host_api_impl.h"
 
 #include <ShellScalingApi.h>
+#include <dwmapi.h>
 #include <windows.h>
 
 #include <algorithm>
@@ -848,14 +849,74 @@ std::optional<FlutterError> WindowHostApiImpl::SetClosable(bool value) {
   return std::nullopt;
 }
 
-std::optional<FlutterError> WindowHostApiImpl::SetFrameless(bool) {
-  return FlutterError(kNotImplemented,
-                      "SetFrameless() not implemented in session 1");
+std::optional<FlutterError> WindowHostApiImpl::SetFrameless(bool value) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  LONG style = GetWindowLongW(hwnd_, GWL_STYLE);
+  if (value) {
+    // Strip caption + thick frame; keep WS_POPUP-equivalent so the window
+    // remains an OS top-level (taskbar still tracks it unless skipTaskbar
+    // is also set). Mirrors NSWindow.styleMask.remove(.titled).
+    style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX |
+               WS_SYSMENU);
+    style |= WS_POPUP;
+  } else {
+    style &= ~WS_POPUP;
+    style |= WS_OVERLAPPEDWINDOW;
+  }
+  SetWindowLongW(hwnd_, GWL_STYLE, style);
+  // SWP_FRAMECHANGED forces Win32 to recompute non-client geometry; without
+  // it the caption visually persists until the next resize.
+  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
+
 std::optional<FlutterError> WindowHostApiImpl::SetTitleBarStyle(
-    const TitleBarStyleRaw&) {
-  return FlutterError(kNotImplemented,
-                      "SetTitleBarStyle() not implemented in session 1");
+    const TitleBarStyleRaw& style) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  title_bar_style_flag_ = style;
+  // Win32 has no native equivalent for macOS's hiddenInset (where the
+  // titlebar stays interactive but the traffic-light buttons sit above the
+  // content area). The closest analog is DwmExtendFrameIntoClientArea,
+  // which pulls the DWM-rendered border + caption into the client area so
+  // app chrome can draw under it. For schema parity:
+  //   normal       -> standard title bar + caption
+  //   hidden       -> remove WS_CAPTION (similar to SetFrameless but keeps
+  //                   the resize border)
+  //   hiddenInset  -> DwmExtendFrameIntoClientArea MARGINS{-1,-1,-1,-1}
+  //                   (sheet of glass over the whole client area)
+  LONG wstyle = GetWindowLongW(hwnd_, GWL_STYLE);
+  switch (style) {
+    case TitleBarStyleRaw::kNormal:
+      wstyle |= WS_CAPTION;
+      SetWindowLongW(hwnd_, GWL_STYLE, wstyle);
+      {
+        MARGINS m = {0, 0, 0, 0};
+        DwmExtendFrameIntoClientArea(hwnd_, &m);
+      }
+      break;
+    case TitleBarStyleRaw::kHidden:
+      wstyle &= ~WS_CAPTION;
+      SetWindowLongW(hwnd_, GWL_STYLE, wstyle);
+      {
+        MARGINS m = {0, 0, 0, 0};
+        DwmExtendFrameIntoClientArea(hwnd_, &m);
+      }
+      break;
+    case TitleBarStyleRaw::kHiddenInset:
+      wstyle |= WS_CAPTION;  // keep caption for traffic-lights equivalent
+      SetWindowLongW(hwnd_, GWL_STYLE, wstyle);
+      {
+        MARGINS m = {-1, -1, -1, -1};
+        DwmExtendFrameIntoClientArea(hwnd_, &m);
+      }
+      break;
+  }
+  SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
 
 std::optional<FlutterError> WindowHostApiImpl::SetOpacity(double) {
