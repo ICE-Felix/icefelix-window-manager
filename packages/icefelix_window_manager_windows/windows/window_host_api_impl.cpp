@@ -69,6 +69,10 @@ WindowHostApiImpl::~WindowHostApiImpl() {
   if (g_instance_ == this) {
     g_instance_ = nullptr;
   }
+  if (current_icon_) {
+    DestroyIcon(current_icon_);
+    current_icon_ = nullptr;
+  }
 }
 
 // ============ WndProc dispatch ============
@@ -262,6 +266,25 @@ void WindowHostApiImpl::EmitDisplaysChanged() {
 }
 
 // ============ Snapshot builder ============
+
+void WindowHostApiImpl::ApplyDwmMargins() {
+  if (!hwnd_) return;
+  // hiddenInset wants a full sheet of glass over the whole client area --
+  // that's the spec contract regardless of the shadow flag. For other
+  // styles, the shadow flag picks between a 1-px shadow margin (DWM draws
+  // the standard window drop shadow) and zero (no shadow). On framed
+  // windows this only affects frameless ones; framed windows always show
+  // DWM's default shadow regardless. Documented in README.
+  MARGINS m;
+  if (title_bar_style_flag_ == TitleBarStyleRaw::kHiddenInset) {
+    m = MARGINS{-1, -1, -1, -1};
+  } else if (has_shadow_flag_) {
+    m = MARGINS{1, 1, 1, 1};
+  } else {
+    m = MARGINS{0, 0, 0, 0};
+  }
+  DwmExtendFrameIntoClientArea(hwnd_, &m);
+}
 
 double WindowHostApiImpl::ScaleFactor() const {
   if (!hwnd_) return 1.0;
@@ -878,62 +901,90 @@ std::optional<FlutterError> WindowHostApiImpl::SetTitleBarStyle(
   title_bar_style_flag_ = style;
   // Win32 has no native equivalent for macOS's hiddenInset (where the
   // titlebar stays interactive but the traffic-light buttons sit above the
-  // content area). The closest analog is DwmExtendFrameIntoClientArea,
-  // which pulls the DWM-rendered border + caption into the client area so
-  // app chrome can draw under it. For schema parity:
-  //   normal       -> standard title bar + caption
-  //   hidden       -> remove WS_CAPTION (similar to SetFrameless but keeps
-  //                   the resize border)
-  //   hiddenInset  -> DwmExtendFrameIntoClientArea MARGINS{-1,-1,-1,-1}
-  //                   (sheet of glass over the whole client area)
+  // content area). The closest analog is DwmExtendFrameIntoClientArea
+  // applied via ApplyDwmMargins() below, which composes with has_shadow_flag_
+  // so the two setters don't clobber each other's DWM slot.
   LONG wstyle = GetWindowLongW(hwnd_, GWL_STYLE);
   switch (style) {
     case TitleBarStyleRaw::kNormal:
+    case TitleBarStyleRaw::kHiddenInset:
+      // Both keep the caption (kHiddenInset for the traffic-lights area).
       wstyle |= WS_CAPTION;
-      SetWindowLongW(hwnd_, GWL_STYLE, wstyle);
-      {
-        MARGINS m = {0, 0, 0, 0};
-        DwmExtendFrameIntoClientArea(hwnd_, &m);
-      }
       break;
     case TitleBarStyleRaw::kHidden:
       wstyle &= ~WS_CAPTION;
-      SetWindowLongW(hwnd_, GWL_STYLE, wstyle);
-      {
-        MARGINS m = {0, 0, 0, 0};
-        DwmExtendFrameIntoClientArea(hwnd_, &m);
-      }
-      break;
-    case TitleBarStyleRaw::kHiddenInset:
-      wstyle |= WS_CAPTION;  // keep caption for traffic-lights equivalent
-      SetWindowLongW(hwnd_, GWL_STYLE, wstyle);
-      {
-        MARGINS m = {-1, -1, -1, -1};
-        DwmExtendFrameIntoClientArea(hwnd_, &m);
-      }
       break;
   }
+  SetWindowLongW(hwnd_, GWL_STYLE, wstyle);
+  ApplyDwmMargins();
   SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
   ScheduleSnapshotEmit();
   return std::nullopt;
 }
 
-std::optional<FlutterError> WindowHostApiImpl::SetOpacity(double) {
-  return FlutterError(kNotImplemented,
-                      "SetOpacity() not implemented in session 1");
+std::optional<FlutterError> WindowHostApiImpl::SetOpacity(double opacity) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  opacity_flag_ = std::clamp(opacity, 0.0, 1.0);
+  // Layered windows are the only way to do per-window alpha on Win32.
+  LONG ex = GetWindowLongW(hwnd_, GWL_EXSTYLE);
+  if (opacity_flag_ < 1.0) {
+    SetWindowLongW(hwnd_, GWL_EXSTYLE, ex | WS_EX_LAYERED);
+    SetLayeredWindowAttributes(hwnd_, 0,
+                               static_cast<BYTE>(opacity_flag_ * 255.0),
+                               LWA_ALPHA);
+  } else {
+    // Opaque path: strip WS_EX_LAYERED so we don't pay the composite cost.
+    SetWindowLongW(hwnd_, GWL_EXSTYLE, ex & ~WS_EX_LAYERED);
+  }
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
-std::optional<FlutterError> WindowHostApiImpl::SetBackgroundColor(int64_t) {
-  return FlutterError(kNotImplemented,
-                      "SetBackgroundColor() not implemented in session 1");
+
+std::optional<FlutterError> WindowHostApiImpl::SetBackgroundColor(int64_t argb) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  background_color_argb_flag_ = argb;
+  // Win32 doesn't let you set a window background color directly the way
+  // NSWindow.backgroundColor does -- the window class brush is set once at
+  // RegisterClass time. The closest behavior is colorkey transparency via
+  // SetLayeredWindowAttributes(LWA_COLORKEY) but that hides matching
+  // pixels, not what users want. Honest behavior: track the flag so the
+  // snapshot reflects it, document the limitation in README, no-op the
+  // actual draw.
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
-std::optional<FlutterError> WindowHostApiImpl::SetHasShadow(bool) {
-  return FlutterError(kNotImplemented,
-                      "SetHasShadow() not implemented in session 1");
+
+std::optional<FlutterError> WindowHostApiImpl::SetHasShadow(bool value) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  has_shadow_flag_ = value;
+  // For frameless windows, DwmExtendFrameIntoClientArea with non-zero
+  // margins makes DWM draw the standard window drop shadow. For framed
+  // windows the shadow is always present (managed by DWM) and there's no
+  // first-party API to disable it -- document the limitation.
+  ApplyDwmMargins();
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
-std::optional<FlutterError> WindowHostApiImpl::SetIcon(const std::string&) {
-  return FlutterError(kNotImplemented,
-                      "SetIcon() not implemented in session 1");
+
+std::optional<FlutterError> WindowHostApiImpl::SetIcon(
+    const std::string& filesystem_path) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  std::wstring wpath = WideFromUtf8(filesystem_path);
+  HICON hicon = (HICON)LoadImageW(nullptr, wpath.c_str(), IMAGE_ICON, 0, 0,
+                                  LR_LOADFROMFILE | LR_DEFAULTSIZE);
+  if (!hicon) {
+    return FlutterError("invalid_icon_path",
+                        "Could not load HICON from " + filesystem_path);
+  }
+  // Destroy the previous icon to avoid GDI handle leak.
+  if (current_icon_) DestroyIcon(current_icon_);
+  current_icon_ = hicon;
+  // Both ICON_BIG (Alt+Tab) and ICON_SMALL (title bar + taskbar).
+  SendMessageW(hwnd_, WM_SETICON, ICON_BIG, (LPARAM)hicon);
+  SendMessageW(hwnd_, WM_SETICON, ICON_SMALL, (LPARAM)hicon);
+  ScheduleSnapshotEmit();
+  return std::nullopt;
 }
 
 std::optional<FlutterError> WindowHostApiImpl::SetPreventClose(bool value) {
