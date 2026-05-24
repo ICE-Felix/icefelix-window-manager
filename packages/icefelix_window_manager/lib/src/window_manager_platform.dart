@@ -135,8 +135,7 @@ class _NativeBridge extends WindowManagerPlatform {
   @override
   Future<void> center() => _api.center();
   @override
-  Future<void> moveToDisplay(String displayId) =>
-      _api.moveToDisplay(displayId);
+  Future<void> moveToDisplay(String displayId) => _api.moveToDisplay(displayId);
 
   @override
   Future<void> minimize() => _api.minimize();

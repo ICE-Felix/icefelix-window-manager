@@ -477,15 +477,15 @@ class _TestbedHomeState extends State<TestbedHome> {
   }
 
   Widget _btn(String label, Future<void> Function() onTap) => ElevatedButton(
-    onPressed: () async {
-      try {
-        await onTap();
-      } catch (e) {
-        _appendLog('ERR: $e');
-      }
-    },
-    child: Text(label),
-  );
+        onPressed: () async {
+          try {
+            await onTap();
+          } catch (e) {
+            _appendLog('ERR: $e');
+          }
+        },
+        child: Text(label),
+      );
 
   Widget _toggle(String label, bool value, void Function(bool) onChanged) =>
       Row(

@@ -140,17 +140,17 @@ List<Offset> _crossPolygon(double size) {
   final t = s / 3; // arm thickness
   final a = (s - t) / 2; // edge offset
   return [
-    Offset(a, 0),         //  top-left of top arm
-    Offset(a + t, 0),     //  top-right of top arm
+    Offset(a, 0), //  top-left of top arm
+    Offset(a + t, 0), //  top-right of top arm
     Offset(a + t, a),
-    Offset(s, a),         //  top-right of right arm
-    Offset(s, a + t),     //  bottom-right of right arm
+    Offset(s, a), //  top-right of right arm
+    Offset(s, a + t), //  bottom-right of right arm
     Offset(a + t, a + t),
-    Offset(a + t, s),     //  bottom-right of bottom arm
-    Offset(a, s),         //  bottom-left of bottom arm
+    Offset(a + t, s), //  bottom-right of bottom arm
+    Offset(a, s), //  bottom-left of bottom arm
     Offset(a, a + t),
-    Offset(0, a + t),     //  bottom-left of left arm
-    Offset(0, a),         //  top-left of left arm
+    Offset(0, a + t), //  bottom-left of left arm
+    Offset(0, a), //  top-left of left arm
     Offset(a, a),
   ];
 }
