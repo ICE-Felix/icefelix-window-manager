@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 - 2026-05-25 — Description & docs update
+
+### Fixed
+- Package description now mentions Linux alongside macOS and Windows.
+- README migration section updated to reference `^0.4.0`.
+
 ## 0.4.1 - 2026-05-25 — Integration test fixes for Linux headless
 
 ### Fixed

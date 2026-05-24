@@ -83,7 +83,7 @@ await WindowManager.instance.setShape([
 
 ## Migrating from 0.2.x
 
-`dependencies: icefelix_window_manager: ^0.3.0` — that's it. If you ever called `IcefelixWindowManagerMacos.registerWith()` or `IcefelixWindowManagerWindows.registerWith()` directly, remove those calls. Flutter now auto-registers the plugin via the pubspec `pluginClass` declarations. Nothing else changes.
+`dependencies: icefelix_window_manager: ^0.4.0` — that's it. If you ever called `IcefelixWindowManagerMacos.registerWith()` or `IcefelixWindowManagerWindows.registerWith()` directly, remove those calls. Flutter now auto-registers the plugin via the pubspec `pluginClass` declarations. Nothing else changes.
 
 ## Linux
 
