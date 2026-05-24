@@ -37,3 +37,11 @@ scripts:
       cd packages/icefelix_window_manager_platform_interface && \
       dart run pigeon --input pigeons/window_api.dart && \
       dart format lib/src/messages.g.dart
+  pigeon_windows:
+    description: Regenerate Pigeon C++ bindings for the Windows package
+    run: |
+      cd packages/icefelix_window_manager_platform_interface && \
+      dart run pigeon --input pigeons/window_api.dart \
+        --cpp_header_out ../icefelix_window_manager_windows/windows/messages.g.h \
+        --cpp_source_out ../icefelix_window_manager_windows/windows/messages.g.cpp \
+        --cpp_namespace icefelix_window_manager_windows

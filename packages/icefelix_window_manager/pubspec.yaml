@@ -2,7 +2,7 @@ name: icefelix_window_manager
 description: >-
   Window management for Flutter desktop apps. Size, position, state,
   multi-monitor, frameless, events. macOS today; Windows + Linux next.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/ICE-Felix/icefelix-window-manager
 issue_tracker: https://github.com/ICE-Felix/icefelix-window-manager/issues
 homepage: https://icefelix.com/packages/window-manager
@@ -16,6 +16,14 @@ funding:
 
 platforms:
   macos:
+  windows:
+
+screenshots:
+  - description: >-
+      Ten differently-shaped Flutter Windows apps running side by side, each
+      a true non-rectangular window via setShape(). See
+      example/polygon_demo for the source.
+    path: screenshots/polygon_promo.png
 
 environment:
   sdk: ^3.6.0
