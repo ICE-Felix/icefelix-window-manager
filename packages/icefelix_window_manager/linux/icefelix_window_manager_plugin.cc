@@ -618,6 +618,7 @@ static void icefelix_window_manager_plugin_init(IcefelixWindowManagerPlugin* sel
 
 void icefelix_window_manager_plugin_register_with_registrar(
     FlPluginRegistrar* registrar) {
+  g_warning("[icefelix] plugin_register_with_registrar called");
   IcefelixWindowManagerPlugin* plugin = ICEFELIX_WINDOW_MANAGER_PLUGIN(
       g_object_new(icefelix_window_manager_plugin_get_type(), nullptr));
   plugin->registrar = registrar;
