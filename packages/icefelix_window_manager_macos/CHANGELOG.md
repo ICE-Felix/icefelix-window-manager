@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.0] - 2026-05-24
+
+### Added
+- `setShape(points)` implementation — best-effort visual mask via
+  `NSWindow.contentView.layer` + `CAShapeLayer` tracing the polygon.
+  Pair with `setFrameless(true)` for the expected look; chrome stays
+  rectangular and clicks do NOT pass through outside the polygon (true
+  non-rectangular hit-testing on macOS would require NSWindow
+  subclassing + isOpaque=false; deferred to a future patch).
+- Backported `preventClose: synchronous preventDefault blocks close`
+  integration test from Windows, so the shared `sync:true` fix in
+  `icefelix_window_manager@0.2.x` can't silently regress on macOS.
+  10/10 integration tests pass on real NSWindow.
+
+### Changed
+- Dependency on `icefelix_window_manager_platform_interface` bumped to
+  `^0.2.0` (required for the new `setShape` Pigeon channel).
+
 ## [0.1.0] - 2026-05-22 — First stable
 
 Swift + AppKit implementation of `icefelix_window_manager_platform_interface`

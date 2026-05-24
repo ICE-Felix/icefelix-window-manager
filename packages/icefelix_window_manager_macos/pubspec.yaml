@@ -3,7 +3,7 @@ description: >-
   macOS implementation of icefelix_window_manager. Wraps NSWindow + AppKit
   via Pigeon-typed channels. App developers depend on icefelix_window_manager,
   not this package.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/ICE-Felix/icefelix-window-manager
 issue_tracker: https://github.com/ICE-Felix/icefelix-window-manager/issues
 homepage: https://icefelix.com/packages/window-manager
@@ -20,7 +20,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  icefelix_window_manager_platform_interface: ^0.1.0
+  icefelix_window_manager_platform_interface: ^0.2.0
 
 dev_dependencies:
   flutter_lints: ^5.0.0

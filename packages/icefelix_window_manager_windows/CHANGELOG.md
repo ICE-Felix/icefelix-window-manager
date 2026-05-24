@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 - 2026-05-24
+
+### Changed
+- Dependency on `icefelix_window_manager_platform_interface` bumped to
+  `^0.2.0` so the new `setShape` Pigeon channel resolves correctly.
+  No native behavior change versus 0.1.0 — this is a constraint-fix
+  release for federated version alignment. The 0.1.0 release on pub.dev
+  shipped with `^0.1.0` and broke when consumers pulled the schema
+  without `setShape` declared.
+
 ## 0.1.0 - 2026-05-24
 
 First publishable Win32 implementation of `icefelix_window_manager_platform_interface` for Windows 10+.

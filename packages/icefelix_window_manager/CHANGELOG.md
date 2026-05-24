@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1 - 2026-05-24
+
+### Changed
+- Dependency on `icefelix_window_manager_platform_interface` bumped to
+  `^0.2.0` so the new `setShape` API resolves to a platform interface
+  version that actually declares the channel. The 0.2.0 release shipped
+  with stale `^0.1.0` constraints and the Pigeon channel was missing at
+  runtime — pana / pub.dev flagged the resulting compile error. No API
+  changes; consumer apps should bump from 0.2.0 → 0.2.1.
+
 ## Unreleased
 
 ### Added
