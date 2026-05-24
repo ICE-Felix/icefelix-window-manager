@@ -1,0 +1,35 @@
+name: polygon_demo
+description: >-
+  Showcase example for icefelix_window_manager's setShape API. A small
+  Flutter Windows app whose OS window is literally hexagon-shaped (not just
+  a hexagon drawn inside a rectangular frame). Pixels outside the polygon
+  don't paint AND clicks pass through to the desktop. Pass --shape=<NAME>
+  to launch as triangle, square, pentagon, hexagon, heptagon, octagon,
+  decagon, star5, star6 or cross.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  cupertino_icons: ^1.0.8
+  flutter:
+    sdk: flutter
+  icefelix_window_manager:
+    path: ../..
+  icefelix_window_manager_windows:
+    path: ../../../icefelix_window_manager_windows
+
+dependency_overrides:
+  icefelix_window_manager_platform_interface:
+    path: ../../../icefelix_window_manager_platform_interface
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

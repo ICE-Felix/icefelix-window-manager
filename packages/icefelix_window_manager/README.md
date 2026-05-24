@@ -62,6 +62,23 @@ WindowManager.instance.events.listen((event) {
 });
 ```
 
+## Showcase: polygon-shaped windows
+
+`setShape` lets the OS window itself be non-rectangular — pixels outside
+the polygon don't paint AND clicks pass through to the desktop. A small
+runnable example lives at `example/polygon_demo`:
+
+![10 polygon-shaped counter windows running side by side](screenshots/polygon_promo.png)
+
+```dart
+await WindowManager.instance.setFrameless(true);
+await WindowManager.instance.setShape([
+  for (var i = 0; i < 6; i++)
+    Offset(180 + 180 * cos(-pi / 2 + i * pi / 3),
+           180 + 180 * sin(-pi / 2 + i * pi / 3)),
+]);
+```
+
 ## Status
 
 This is **W2 (macOS native impl complete)**. See [project tracker](https://github.com/ICE-Felix/icefelix-window-manager) for Windows + Linux progress.

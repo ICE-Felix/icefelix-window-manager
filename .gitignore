@@ -45,3 +45,19 @@ packages/**/example/macos/Flutter/flutter_export_environment.sh
 
 # Marketing drafts (kept local)
 launch/
+
+# Ephemeral debug/promo screenshots dropped at the repo root during
+# interactive sessions. Real release screenshots live under
+# packages/<pkg>/screenshots/ and ARE committed.
+/testbed-*.png
+/demo-*.png
+
+# Nested Windows example build artifacts (e.g. polygon_demo) — the
+# packages/**/example/ rules above don't catch deeper subdirectories.
+packages/**/example/**/build/
+packages/**/example/**/windows/flutter/ephemeral/
+packages/**/example/**/windows/flutter/generated_plugin_registrant.cc
+packages/**/example/**/windows/flutter/generated_plugin_registrant.h
+packages/**/example/**/windows/flutter/generated_plugins.cmake
+packages/**/example/**/.dart_tool/
+packages/**/example/**/.flutter-plugins-dependencies

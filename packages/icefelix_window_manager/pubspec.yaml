@@ -18,6 +18,13 @@ platforms:
   macos:
   windows:
 
+screenshots:
+  - description: >-
+      Ten differently-shaped Flutter Windows apps running side by side, each
+      a true non-rectangular window via setShape(). See
+      example/polygon_demo for the source.
+    path: screenshots/polygon_promo.png
+
 environment:
   sdk: ^3.6.0
   flutter: ">=3.27.0"
