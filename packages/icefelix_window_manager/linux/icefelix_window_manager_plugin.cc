@@ -141,16 +141,20 @@ static IcefelixWindowManagerWindowSnapshotRaw* build_snapshot(
 static gboolean emit_snapshot_cb(gpointer user_data) {
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   self->snapshot_emit_source = 0;
+  g_print("[icefelix] emit_snapshot_cb: flutter_api=%p\n", (void*)self->flutter_api);
   if (self->flutter_api != nullptr) {
     IcefelixWindowManagerWindowSnapshotRaw* snap = build_snapshot(self);
+    g_print("[icefelix] emit_snapshot_cb: sending onSnapshotChanged\n");
     icefelix_window_manager_window_flutter_api_on_snapshot_changed(
         self->flutter_api, snap, nullptr, nullptr, nullptr);
+    g_print("[icefelix] emit_snapshot_cb: send returned\n");
     g_object_unref(snap);
   }
   return G_SOURCE_REMOVE;
 }
 
 static void schedule_snapshot_emit(IcefelixWindowManagerPlugin* self) {
+  g_print("[icefelix] schedule_snapshot_emit called\n");
   if (self->snapshot_emit_source != 0) {
     g_source_remove(self->snapshot_emit_source);
   }
