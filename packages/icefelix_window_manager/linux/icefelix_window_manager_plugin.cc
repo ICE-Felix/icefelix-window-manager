@@ -31,6 +31,10 @@ struct _IcefelixWindowManagerPlugin {
   gboolean background_color_set;
   gboolean has_shadow_flag;
 
+  // Two-pass close protocol (mirrors macOS pattern).
+  gboolean allow_next_close;
+  gboolean close_request_in_flight;
+
   // Coalescing timer id for snapshot emit.
   guint snapshot_emit_source;
 };
@@ -262,11 +266,79 @@ static gboolean on_focus_out_event(GtkWidget* /*w*/, GdkEvent* /*e*/, gpointer u
   schedule_snapshot_emit(ICEFELIX_WINDOW_MANAGER_PLUGIN(ud));
   return FALSE;
 }
+// Forward declaration for the async close-request response callback.
+static void on_close_request_response(GObject* source, GAsyncResult* result,
+                                       gpointer ud);
+
 static gboolean on_delete_event(GtkWidget* /*w*/, GdkEvent* /*e*/, gpointer ud) {
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(ud);
-  // If preventClose flag is set, ask Dart side. (Etapa 3 will wire the real
-  // sync request flow; for now we just respect the local flag.)
-  return self->prevent_close_flag ? TRUE : FALSE;
+
+  // Pass 2: this delete-event was re-issued by the response callback after
+  // Dart allowed close. Let GTK proceed.
+  if (self->allow_next_close) {
+    self->allow_next_close = FALSE;
+    return FALSE;
+  }
+
+  // No interception requested, or no FlutterApi to ask — let GTK close.
+  if (!self->prevent_close_flag || self->flutter_api == nullptr) {
+    return FALSE;
+  }
+
+  // Duplicate delete-event while Dart is already deciding — suppress.
+  if (self->close_request_in_flight) {
+    return TRUE;
+  }
+
+  // Pass 1: block close, fire async onCloseRequest to Dart.
+  // g_object_ref keeps self alive across the async gap.
+  self->close_request_in_flight = TRUE;
+  icefelix_window_manager_window_flutter_api_on_close_request(
+      self->flutter_api, nullptr, on_close_request_response,
+      g_object_ref(self));
+
+  return TRUE;  // Block this delete-event; Dart decides asynchronously.
+}
+
+// Called from g_idle_add to re-issue gtk_window_close on the GTK main thread
+// after Dart allowed close.
+static gboolean reissue_close_on_main(gpointer ud) {
+  IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(ud);
+  GtkWindow* window = get_gtk_window(self);
+  if (window != nullptr) {
+    self->allow_next_close = TRUE;
+    gtk_window_close(window);
+  } else {
+    self->allow_next_close = FALSE;
+  }
+  g_object_unref(self);  // Balance ref from on_close_request_response.
+  return G_SOURCE_REMOVE;
+}
+
+// Async callback: Dart's onCloseRequest returned allow (true) or deny (false).
+static void on_close_request_response(GObject* /*source*/, GAsyncResult* result,
+                                       gpointer ud) {
+  IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(ud);
+  self->close_request_in_flight = FALSE;
+
+  g_autoptr(GError) error = nullptr;
+  IcefelixWindowManagerWindowFlutterApiOnCloseRequestResponse* resp =
+      icefelix_window_manager_window_flutter_api_on_close_request_finish(
+          self->flutter_api, result, &error);
+
+  // Default-allow on error so the user is never trapped in an unclosable window.
+  gboolean allow = TRUE;
+  if (error == nullptr && resp != nullptr) {
+    allow = icefelix_window_manager_window_flutter_api_on_close_request_response_get_return_value(resp);
+  }
+
+  if (allow) {
+    // Queue the re-close onto the GTK main loop. ud already has a ref from
+    // on_delete_event; reissue_close_on_main will unref.
+    g_idle_add(reissue_close_on_main, ud);
+  } else {
+    g_object_unref(self);  // Balance ref from on_delete_event.
+  }
 }
 
 // ============================================================================
@@ -685,8 +757,27 @@ STUB(blur, Blur, (gpointer /*ud*/))
 STUB(start_drag, StartDrag, (gpointer /*ud*/))
 STUB(start_resize, StartResize,
      (IcefelixWindowManagerResizeDirectionRaw /*dir*/, gpointer /*ud*/))
-STUB(close, Close, (gpointer /*ud*/))
-STUB(destroy, Destroy, (gpointer /*ud*/))
+// close: routes through delete-event, respects preventClose two-pass flow.
+static IcefelixWindowManagerWindowHostApiCloseResponse* h_close(
+    gpointer user_data) {
+  IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
+  GtkWindow* window = get_gtk_window(self);
+  if (window != nullptr) {
+    gtk_window_close(window);
+  }
+  return icefelix_window_manager_window_host_api_close_response_new();
+}
+
+// destroy: bypasses delete-event, unconditional widget destruction.
+static IcefelixWindowManagerWindowHostApiDestroyResponse* h_destroy(
+    gpointer user_data) {
+  IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
+  GtkWindow* window = get_gtk_window(self);
+  if (window != nullptr) {
+    gtk_widget_destroy(GTK_WIDGET(window));
+  }
+  return icefelix_window_manager_window_host_api_destroy_response_new();
+}
 STUB(set_movable, SetMovable, (gboolean /*value*/, gpointer /*ud*/))
 STUB(set_minimizable, SetMinimizable, (gboolean /*value*/, gpointer /*ud*/))
 STUB(set_shape, SetShape, (FlValue* /*points*/, gpointer /*ud*/))
