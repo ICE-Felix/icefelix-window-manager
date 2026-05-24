@@ -141,32 +141,16 @@ static IcefelixWindowManagerWindowSnapshotRaw* build_snapshot(
 static gboolean emit_snapshot_cb(gpointer user_data) {
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   self->snapshot_emit_source = 0;
-  g_warning("[icefelix] emit_snapshot_cb: flutter_api=%p\n", (void*)self->flutter_api);
-  {
-    FILE* f = fopen("/tmp/icefelix_debug.log", "a");
-    if (f) { fprintf(f, "emit_snapshot_cb: flutter_api=%p\n", (void*)self->flutter_api); fclose(f); }
-  }
   if (self->flutter_api != nullptr) {
     IcefelixWindowManagerWindowSnapshotRaw* snap = build_snapshot(self);
-    g_warning("[icefelix] emit_snapshot_cb: sending onSnapshotChanged\n");
     icefelix_window_manager_window_flutter_api_on_snapshot_changed(
         self->flutter_api, snap, nullptr, nullptr, nullptr);
-    g_warning("[icefelix] emit_snapshot_cb: send returned\n");
-    {
-      FILE* f = fopen("/tmp/icefelix_debug.log", "a");
-      if (f) { fprintf(f, "emit_snapshot_cb: send returned\n"); fclose(f); }
-    }
     g_object_unref(snap);
   }
   return G_SOURCE_REMOVE;
 }
 
 static void schedule_snapshot_emit(IcefelixWindowManagerPlugin* self) {
-  g_warning("[icefelix] schedule_snapshot_emit called\n");
-  {
-    FILE* f = fopen("/tmp/icefelix_debug.log", "a");
-    if (f) { fprintf(f, "schedule_snapshot_emit called\n"); fclose(f); }
-  }
   if (self->snapshot_emit_source != 0) {
     g_source_remove(self->snapshot_emit_source);
   }
@@ -224,7 +208,6 @@ static void install_signal_handlers(IcefelixWindowManagerPlugin* self) {
 
 static IcefelixWindowManagerWindowHostApiEnsureInitializedResponse*
 h_ensure_initialized(gpointer user_data) {
-  g_warning("[icefelix] h_ensure_initialized called");
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   // Install signal handlers on first call (the GtkWindow is available by now).
   install_signal_handlers(self);
@@ -441,11 +424,6 @@ static IcefelixWindowManagerWindowHostApiFocusResponse* h_focus(
 
 static IcefelixWindowManagerWindowHostApiSetTitleResponse* h_set_title(
     const gchar* title, gpointer user_data) {
-  g_warning("[icefelix] h_set_title called: title=%s\n", title ? title : "(null)");
-  {
-    FILE* f = fopen("/tmp/icefelix_debug.log", "a");
-    if (f) { fprintf(f, "h_set_title: %s\n", title ? title : "(null)"); fclose(f); }
-  }
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   GtkWindow* window = get_gtk_window(self);
   if (window != nullptr) gtk_window_set_title(window, title);
@@ -634,11 +612,6 @@ static void icefelix_window_manager_plugin_init(IcefelixWindowManagerPlugin* sel
 
 void icefelix_window_manager_plugin_register_with_registrar(
     FlPluginRegistrar* registrar) {
-  g_warning("[icefelix] plugin_register_with_registrar called");
-  {
-    FILE* f = fopen("/tmp/icefelix_debug.log", "a");
-    if (f) { fprintf(f, "register_with_registrar called\n"); fclose(f); }
-  }
   IcefelixWindowManagerPlugin* plugin = ICEFELIX_WINDOW_MANAGER_PLUGIN(
       g_object_new(icefelix_window_manager_plugin_get_type(), nullptr));
   plugin->registrar = registrar;

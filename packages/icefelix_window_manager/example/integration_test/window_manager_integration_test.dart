@@ -56,12 +56,7 @@ void main() {
 
   testWidgets('setTitle updates snapshot.title', (tester) async {
     await WindowManager.instance.setTitle('Integration Test');
-    // DEBUG: pump to process incoming platform messages
-    for (int i = 0; i < 40; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-      if (WindowManager.instance.snapshot.value.title == 'Integration Test') break;
-    }
-    expect(WindowManager.instance.snapshot.value.title, 'Integration Test');
+    await waitForSnapshot((s) => s.title == 'Integration Test');
   });
 
   testWidgets('setAlwaysOnTop updates snapshot.alwaysOnTop', (tester) async {

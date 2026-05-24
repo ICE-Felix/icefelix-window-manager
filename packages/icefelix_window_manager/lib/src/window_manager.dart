@@ -325,8 +325,6 @@ class WindowManager {
   /// Called by platform when snapshot changes. Computes diff vs previous
   /// snapshot and emits corresponding WindowEvent(s) on [events] stream.
   void onSnapshotChanged(WindowSnapshotRaw pigeon) {
-    // ignore: avoid_print
-    print('[icefelix dart] onSnapshotChanged called');
     final newSnap = _convertSnapshot(pigeon);
     final oldSnap = _snapshot._value;
     _snapshot._set(newSnap);
