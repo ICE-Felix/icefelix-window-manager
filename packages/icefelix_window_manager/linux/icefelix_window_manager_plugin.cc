@@ -56,9 +56,6 @@ static GtkWindow* get_gtk_window(IcefelixWindowManagerPlugin* self) {
 // ============================================================================
 
 static IcefelixWindowManagerDisplayRaw* make_default_display_raw() {
-  // TODO(linux v0.4.x): replace with real gdk_display_get_primary_monitor
-  // introspection (model+manufacturer for stable id, scale_factor,
-  // refresh_rate, physical size).
   IcefelixWindowManagerRectRaw* bounds =
       icefelix_window_manager_rect_raw_new(0, 0, 1920, 1080);
   IcefelixWindowManagerRectRaw* work_area =
@@ -66,6 +63,92 @@ static IcefelixWindowManagerDisplayRaw* make_default_display_raw() {
   return icefelix_window_manager_display_raw_new(
       "linux-default-display", "Linux Display", bounds, work_area, nullptr,
       nullptr, nullptr, 1.0, TRUE, nullptr);
+}
+
+// Actual parameter order from generated header:
+//   (id, name, bounds, work_area,
+//    physical_width_mm*, physical_height_mm*, dpi*,
+//    scale_factor, is_primary, refresh_rate*)
+// where mm values and dpi are double*, refresh_rate is int64_t*.
+static IcefelixWindowManagerDisplayRaw* make_display_raw_from_monitor(
+    GdkMonitor* monitor, gboolean is_primary, int index_fallback) {
+  if (monitor == nullptr) return nullptr;
+
+  GdkRectangle geom = {};
+  gdk_monitor_get_geometry(monitor, &geom);
+  GdkRectangle work = {};
+  gdk_monitor_get_workarea(monitor, &work);
+
+  const gchar* manufacturer = gdk_monitor_get_manufacturer(monitor);
+  const gchar* model = gdk_monitor_get_model(monitor);
+  gchar* id = nullptr;
+  if (manufacturer != nullptr && model != nullptr) {
+    id = g_strdup_printf("%s|%s", manufacturer, model);
+  } else if (model != nullptr) {
+    id = g_strdup(model);
+  } else if (manufacturer != nullptr) {
+    id = g_strdup(manufacturer);
+  } else {
+    id = g_strdup_printf("linux-monitor-%d", index_fallback);
+  }
+
+  const gchar* name = model != nullptr ? model
+                    : manufacturer != nullptr ? manufacturer
+                    : id;
+
+  gdouble scale = (gdouble)gdk_monitor_get_scale_factor(monitor);
+
+  int refresh_mhz = gdk_monitor_get_refresh_rate(monitor);
+  int64_t* refresh_rate_ptr = nullptr;
+  int64_t refresh_rate_val = 0;
+  if (refresh_mhz > 0) {
+    // refresh_rate field is int64_t* millihertz in the generated API
+    refresh_rate_val = (int64_t)refresh_mhz;
+    refresh_rate_ptr = &refresh_rate_val;
+  }
+
+  int width_mm_int = gdk_monitor_get_width_mm(monitor);
+  int height_mm_int = gdk_monitor_get_height_mm(monitor);
+  double* physical_width_mm_ptr = nullptr;
+  double* physical_height_mm_ptr = nullptr;
+  double physical_width_mm_val = (double)width_mm_int;
+  double physical_height_mm_val = (double)height_mm_int;
+  if (width_mm_int > 0) physical_width_mm_ptr = &physical_width_mm_val;
+  if (height_mm_int > 0) physical_height_mm_ptr = &physical_height_mm_val;
+
+  IcefelixWindowManagerRectRaw* bounds =
+      icefelix_window_manager_rect_raw_new(geom.x, geom.y, geom.width, geom.height);
+  IcefelixWindowManagerRectRaw* work_area =
+      icefelix_window_manager_rect_raw_new(work.x, work.y, work.width, work.height);
+
+  // dpi: not directly provided by GDK; pass nullptr.
+  IcefelixWindowManagerDisplayRaw* raw =
+      icefelix_window_manager_display_raw_new(
+          id, name, bounds, work_area,
+          physical_width_mm_ptr, physical_height_mm_ptr,
+          nullptr /* dpi */, scale, is_primary, refresh_rate_ptr);
+
+  g_free(id);
+  return raw;
+}
+
+static IcefelixWindowManagerDisplayRaw* current_display_or_default(
+    IcefelixWindowManagerPlugin* self) {
+  GtkWindow* window = get_gtk_window(self);
+  GdkDisplay* display = gdk_display_get_default();
+  if (window != nullptr && display != nullptr) {
+    GdkWindow* gw = gtk_widget_get_window(GTK_WIDGET(window));
+    if (gw != nullptr) {
+      GdkMonitor* m = gdk_display_get_monitor_at_window(display, gw);
+      if (m != nullptr) {
+        GdkMonitor* primary = gdk_display_get_primary_monitor(display);
+        IcefelixWindowManagerDisplayRaw* d =
+            make_display_raw_from_monitor(m, m == primary, 0);
+        if (d != nullptr) return d;
+      }
+    }
+  }
+  return make_default_display_raw();
 }
 
 static IcefelixWindowManagerWindowStateRaw current_state(GtkWindow* window) {
@@ -132,7 +215,7 @@ static IcefelixWindowManagerWindowSnapshotRaw* build_snapshot(
       self->title_bar_style_flag, opacity,
       self->background_color_set ? &self->background_color_argb_flag : nullptr,
       self->has_shadow_flag, self->prevent_close_flag,
-      make_default_display_raw());
+      current_display_or_default(self));
 }
 
 // ============================================================================
@@ -186,6 +269,39 @@ static gboolean on_delete_event(GtkWidget* /*w*/, GdkEvent* /*e*/, gpointer ud) 
   return self->prevent_close_flag ? TRUE : FALSE;
 }
 
+// ============================================================================
+// Hot-plug: monitor-added / monitor-removed
+// ============================================================================
+
+static void emit_displays_changed(IcefelixWindowManagerPlugin* self) {
+  if (self->flutter_api == nullptr) return;
+  g_autoptr(FlValue) display_list = fl_value_new_list();
+  GdkDisplay* display = gdk_display_get_default();
+  if (display != nullptr) {
+    GdkMonitor* primary = gdk_display_get_primary_monitor(display);
+    int n = gdk_display_get_n_monitors(display);
+    for (int i = 0; i < n; ++i) {
+      GdkMonitor* m = gdk_display_get_monitor(display, i);
+      IcefelixWindowManagerDisplayRaw* raw =
+          make_display_raw_from_monitor(m, m == primary, i);
+      if (raw != nullptr) {
+        fl_value_append_take(display_list,
+            fl_value_new_custom_object(137, G_OBJECT(raw)));
+        g_object_unref(raw);
+      }
+    }
+  }
+  icefelix_window_manager_window_flutter_api_on_displays_changed(
+      self->flutter_api, display_list, nullptr, nullptr, nullptr);
+}
+
+static void on_monitor_added(GdkDisplay* /*d*/, GdkMonitor* /*m*/, gpointer ud) {
+  emit_displays_changed(ICEFELIX_WINDOW_MANAGER_PLUGIN(ud));
+}
+static void on_monitor_removed(GdkDisplay* /*d*/, GdkMonitor* /*m*/, gpointer ud) {
+  emit_displays_changed(ICEFELIX_WINDOW_MANAGER_PLUGIN(ud));
+}
+
 static void install_signal_handlers(IcefelixWindowManagerPlugin* self) {
   GtkWindow* window = get_gtk_window(self);
   if (window == nullptr) return;
@@ -195,6 +311,14 @@ static void install_signal_handlers(IcefelixWindowManagerPlugin* self) {
   g_signal_connect(window, "focus-in-event", G_CALLBACK(on_focus_in_event), self);
   g_signal_connect(window, "focus-out-event", G_CALLBACK(on_focus_out_event), self);
   g_signal_connect(window, "delete-event", G_CALLBACK(on_delete_event), self);
+
+  GdkDisplay* gdk_display = gdk_display_get_default();
+  if (gdk_display != nullptr) {
+    g_signal_connect(gdk_display, "monitor-added",
+                     G_CALLBACK(on_monitor_added), self);
+    g_signal_connect(gdk_display, "monitor-removed",
+                     G_CALLBACK(on_monitor_removed), self);
+  }
 }
 
 // ============================================================================
@@ -573,20 +697,66 @@ STUB(set_shape, SetShape, (FlValue* /*points*/, gpointer /*ud*/))
 
 static IcefelixWindowManagerWindowHostApiListDisplaysResponse* h_list_displays(
     gpointer /*user_data*/) {
-  IcefelixWindowManagerDisplayRaw* display = make_default_display_raw();
   g_autoptr(FlValue) display_list = fl_value_new_list();
-  fl_value_append_take(display_list,
-      fl_value_new_custom_object(137, G_OBJECT(display)));
-  g_object_unref(display);
+  GdkDisplay* display = gdk_display_get_default();
+  if (display != nullptr) {
+    GdkMonitor* primary = gdk_display_get_primary_monitor(display);
+    int n = gdk_display_get_n_monitors(display);
+    for (int i = 0; i < n; ++i) {
+      GdkMonitor* m = gdk_display_get_monitor(display, i);
+      IcefelixWindowManagerDisplayRaw* raw =
+          make_display_raw_from_monitor(m, m == primary, i);
+      if (raw != nullptr) {
+        fl_value_append_take(display_list,
+            fl_value_new_custom_object(137, G_OBJECT(raw)));
+        g_object_unref(raw);
+      }
+    }
+  }
+  if (fl_value_get_length(display_list) == 0) {
+    IcefelixWindowManagerDisplayRaw* fallback = make_default_display_raw();
+    fl_value_append_take(display_list,
+        fl_value_new_custom_object(137, G_OBJECT(fallback)));
+    g_object_unref(fallback);
+  }
   return icefelix_window_manager_window_host_api_list_displays_response_new(display_list);
 }
 static IcefelixWindowManagerWindowHostApiGetCurrentDisplayResponse*
-h_get_current_display(gpointer /*user_data*/) {
+h_get_current_display(gpointer user_data) {
+  IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
+  GtkWindow* window = get_gtk_window(self);
+  GdkDisplay* display = gdk_display_get_default();
+  if (window != nullptr && display != nullptr) {
+    GdkWindow* gdk_window = gtk_widget_get_window(GTK_WIDGET(window));
+    if (gdk_window != nullptr) {
+      GdkMonitor* m = gdk_display_get_monitor_at_window(display, gdk_window);
+      if (m != nullptr) {
+        GdkMonitor* primary = gdk_display_get_primary_monitor(display);
+        IcefelixWindowManagerDisplayRaw* raw =
+            make_display_raw_from_monitor(m, m == primary, 0);
+        if (raw != nullptr) {
+          return icefelix_window_manager_window_host_api_get_current_display_response_new(raw);
+        }
+      }
+    }
+  }
   return icefelix_window_manager_window_host_api_get_current_display_response_new(
       make_default_display_raw());
 }
+
 static IcefelixWindowManagerWindowHostApiGetPrimaryDisplayResponse*
 h_get_primary_display(gpointer /*user_data*/) {
+  GdkDisplay* display = gdk_display_get_default();
+  if (display != nullptr) {
+    GdkMonitor* primary = gdk_display_get_primary_monitor(display);
+    if (primary != nullptr) {
+      IcefelixWindowManagerDisplayRaw* raw =
+          make_display_raw_from_monitor(primary, TRUE, 0);
+      if (raw != nullptr) {
+        return icefelix_window_manager_window_host_api_get_primary_display_response_new(raw);
+      }
+    }
+  }
   return icefelix_window_manager_window_host_api_get_primary_display_response_new(
       make_default_display_raw());
 }
