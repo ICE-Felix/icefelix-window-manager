@@ -45,3 +45,7 @@ packages/**/example/macos/Flutter/flutter_export_environment.sh
 
 # Marketing drafts (kept local)
 launch/
+
+# Social posting tooling (Playwright + saved sessions) — local-only
+posting/
+launch/publish/
