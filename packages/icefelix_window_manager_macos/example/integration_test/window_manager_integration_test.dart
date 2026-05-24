@@ -128,4 +128,35 @@ void main() {
     );
     await WindowManager.instance.setMinSize(null);
   });
+
+  // Regression: preventClose=true + a listener calling event.preventDefault()
+  // must block the close. The bug existed silently on macOS too: the
+  // WindowManager._events stream was async-broadcast, so the Pigeon-generated
+  // synchronous onCloseRequest read _closeRequestBlocked before any queued
+  // listener microtask could vote — preventDefault() was a no-op end-to-end.
+  // Surfaced first on Windows (integration test added there); backported here
+  // so the macOS side can't silently regress if the fix ever gets reverted.
+  // The fix lives in the shared app-facing package: _events is now sync:true.
+  // Uses the public debugSimulateCloseRequest hook to drive the close path
+  // without actually closing the test runner window.
+  testWidgets('preventClose: synchronous preventDefault blocks close', (
+    tester,
+  ) async {
+    await WindowManager.instance.setPreventClose(true);
+    final sub = WindowManager.instance.events.listen((event) {
+      if (event is WindowCloseRequestEvent) {
+        event.preventDefault();
+      }
+    });
+    final allowed = await WindowManager.instance.debugSimulateCloseRequest();
+    await sub.cancel();
+    await WindowManager.instance.setPreventClose(false);
+    expect(
+      allowed,
+      isFalse,
+      reason: 'preventDefault() in a listener should set the verdict to deny, '
+          'even though listeners are async-scheduled in some Dart stream '
+          'configurations. Fix: WindowManager._events is sync:true.',
+    );
+  });
 }
