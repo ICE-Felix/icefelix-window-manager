@@ -20,8 +20,7 @@ PlatformException _createConnectionError(String channelName) {
   );
 }
 
-List<Object?> wrapResponse(
-    {Object? result, PlatformException? error, bool empty = false}) {
+List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty = false}) {
   if (empty) {
     return <Object?>[];
   }
@@ -378,6 +377,7 @@ class PlatformInfoRaw {
   }
 }
 
+
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -385,37 +385,37 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    } else if (value is WindowStateRaw) {
+    }    else if (value is WindowStateRaw) {
       buffer.putUint8(129);
       writeValue(buffer, value.index);
-    } else if (value is TitleBarStyleRaw) {
+    }    else if (value is TitleBarStyleRaw) {
       buffer.putUint8(130);
       writeValue(buffer, value.index);
-    } else if (value is ResizeDirectionRaw) {
+    }    else if (value is ResizeDirectionRaw) {
       buffer.putUint8(131);
       writeValue(buffer, value.index);
-    } else if (value is DisplayServerRaw) {
+    }    else if (value is DisplayServerRaw) {
       buffer.putUint8(132);
       writeValue(buffer, value.index);
-    } else if (value is OffsetRaw) {
+    }    else if (value is OffsetRaw) {
       buffer.putUint8(133);
       writeValue(buffer, value.encode());
-    } else if (value is SizeRaw) {
+    }    else if (value is SizeRaw) {
       buffer.putUint8(134);
       writeValue(buffer, value.encode());
-    } else if (value is RectRaw) {
+    }    else if (value is RectRaw) {
       buffer.putUint8(135);
       writeValue(buffer, value.encode());
-    } else if (value is WindowBoundsRaw) {
+    }    else if (value is WindowBoundsRaw) {
       buffer.putUint8(136);
       writeValue(buffer, value.encode());
-    } else if (value is DisplayRaw) {
+    }    else if (value is DisplayRaw) {
       buffer.putUint8(137);
       writeValue(buffer, value.encode());
-    } else if (value is WindowSnapshotRaw) {
+    }    else if (value is WindowSnapshotRaw) {
       buffer.putUint8(138);
       writeValue(buffer, value.encode());
-    } else if (value is PlatformInfoRaw) {
+    }    else if (value is PlatformInfoRaw) {
       buffer.putUint8(139);
       writeValue(buffer, value.encode());
     } else {
@@ -426,31 +426,31 @@ class _PigeonCodec extends StandardMessageCodec {
   @override
   Object? readValueOfType(int type, ReadBuffer buffer) {
     switch (type) {
-      case 129:
+      case 129: 
         final int? value = readValue(buffer) as int?;
         return value == null ? null : WindowStateRaw.values[value];
-      case 130:
+      case 130: 
         final int? value = readValue(buffer) as int?;
         return value == null ? null : TitleBarStyleRaw.values[value];
-      case 131:
+      case 131: 
         final int? value = readValue(buffer) as int?;
         return value == null ? null : ResizeDirectionRaw.values[value];
-      case 132:
+      case 132: 
         final int? value = readValue(buffer) as int?;
         return value == null ? null : DisplayServerRaw.values[value];
-      case 133:
+      case 133: 
         return OffsetRaw.decode(readValue(buffer)!);
-      case 134:
+      case 134: 
         return SizeRaw.decode(readValue(buffer)!);
-      case 135:
+      case 135: 
         return RectRaw.decode(readValue(buffer)!);
-      case 136:
+      case 136: 
         return WindowBoundsRaw.decode(readValue(buffer)!);
-      case 137:
+      case 137: 
         return DisplayRaw.decode(readValue(buffer)!);
-      case 138:
+      case 138: 
         return WindowSnapshotRaw.decode(readValue(buffer)!);
-      case 139:
+      case 139: 
         return PlatformInfoRaw.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -462,11 +462,9 @@ class WindowHostApi {
   /// Constructor for [WindowHostApi].  The [binaryMessenger] named argument is
   /// available for dependency injection.  If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  WindowHostApi(
-      {BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
+  WindowHostApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
       : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix =
-            messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
 
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
@@ -474,10 +472,8 @@ class WindowHostApi {
   final String pigeonVar_messageChannelSuffix;
 
   Future<WindowSnapshotRaw> ensureInitialized() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.ensureInitialized$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.ensureInitialized$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -503,10 +499,8 @@ class WindowHostApi {
   }
 
   Future<PlatformInfoRaw> getPlatformInfo() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.getPlatformInfo$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.getPlatformInfo$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -532,10 +526,8 @@ class WindowHostApi {
   }
 
   Future<WindowBoundsRaw> getBounds() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.getBounds$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.getBounds$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -569,16 +561,14 @@ class WindowHostApi {
   /// - moveToDisplay(displayId) = "move window to display X, preserving current relative position"
   /// Use setBounds when you have specific coordinates; use moveToDisplay when you just want to switch monitors.
   Future<void> setBounds(WindowBoundsRaw bounds, String? displayId) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setBounds$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setBounds$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final List<Object?>? pigeonVar_replyList = await pigeonVar_channel
-        .send(<Object?>[bounds, displayId]) as List<Object?>?;
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[bounds, displayId]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
       throw _createConnectionError(pigeonVar_channelName);
     } else if (pigeonVar_replyList.length > 1) {
@@ -596,10 +586,8 @@ class WindowHostApi {
   /// All size APIs and snapshot.bounds.size share this frame-based coordinate
   /// space. Top-left position is preserved.
   Future<void> setSize(SizeRaw size) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setSize$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setSize$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -623,10 +611,8 @@ class WindowHostApi {
   /// Coordinate space matches [setSize] — same frame, including titlebar.
   /// Future drag-resize and `setSize` calls clamp against this bound.
   Future<void> setMinSize(SizeRaw? size) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setMinSize$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setMinSize$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -650,10 +636,8 @@ class WindowHostApi {
   /// Coordinate space matches [setSize] — same frame, including titlebar.
   /// `maximize()` (a.k.a. zoom) also respects this bound.
   Future<void> setMaxSize(SizeRaw? size) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setMaxSize$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setMaxSize$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -674,10 +658,8 @@ class WindowHostApi {
   }
 
   Future<void> setPosition(OffsetRaw position) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setPosition$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setPosition$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -698,10 +680,8 @@ class WindowHostApi {
   }
 
   Future<void> center() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.center$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.center$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -725,10 +705,8 @@ class WindowHostApi {
   /// If the preserved position doesn't fit on the new display, centers instead.
   /// Distinct from setBounds(bounds, displayId) — see setBounds for explicit positioning.
   Future<void> moveToDisplay(String displayId) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.moveToDisplay$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.moveToDisplay$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -749,10 +727,8 @@ class WindowHostApi {
   }
 
   Future<void> minimize() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.minimize$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.minimize$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -773,10 +749,8 @@ class WindowHostApi {
   }
 
   Future<void> maximize() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.maximize$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.maximize$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -797,10 +771,8 @@ class WindowHostApi {
   }
 
   Future<void> unmaximize() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.unmaximize$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.unmaximize$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -821,10 +793,8 @@ class WindowHostApi {
   }
 
   Future<void> restore() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.restore$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.restore$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -845,10 +815,8 @@ class WindowHostApi {
   }
 
   Future<void> hide() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.hide$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.hide$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -869,10 +837,8 @@ class WindowHostApi {
   }
 
   Future<void> show() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.show$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.show$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -893,10 +859,8 @@ class WindowHostApi {
   }
 
   Future<void> fullscreen() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.fullscreen$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.fullscreen$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -917,10 +881,8 @@ class WindowHostApi {
   }
 
   Future<void> exitFullscreen() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.exitFullscreen$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.exitFullscreen$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -941,10 +903,8 @@ class WindowHostApi {
   }
 
   Future<void> focus() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.focus$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.focus$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -965,10 +925,8 @@ class WindowHostApi {
   }
 
   Future<void> blur() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.blur$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.blur$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -989,10 +947,8 @@ class WindowHostApi {
   }
 
   Future<void> startDrag() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.startDrag$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.startDrag$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1013,10 +969,8 @@ class WindowHostApi {
   }
 
   Future<void> startResize(ResizeDirectionRaw direction) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.startResize$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.startResize$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1037,10 +991,8 @@ class WindowHostApi {
   }
 
   Future<void> close() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.close$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.close$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1061,10 +1013,8 @@ class WindowHostApi {
   }
 
   Future<void> destroy() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.destroy$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.destroy$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1085,10 +1035,8 @@ class WindowHostApi {
   }
 
   Future<void> setTitle(String title) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setTitle$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setTitle$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1109,10 +1057,8 @@ class WindowHostApi {
   }
 
   Future<void> setAlwaysOnTop(bool value) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setAlwaysOnTop$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setAlwaysOnTop$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1133,10 +1079,8 @@ class WindowHostApi {
   }
 
   Future<void> setSkipTaskbar(bool value) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setSkipTaskbar$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setSkipTaskbar$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1157,10 +1101,8 @@ class WindowHostApi {
   }
 
   Future<void> setResizable(bool value) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setResizable$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setResizable$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1181,10 +1123,8 @@ class WindowHostApi {
   }
 
   Future<void> setMovable(bool value) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setMovable$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setMovable$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1205,10 +1145,8 @@ class WindowHostApi {
   }
 
   Future<void> setMinimizable(bool value) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setMinimizable$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setMinimizable$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1229,10 +1167,8 @@ class WindowHostApi {
   }
 
   Future<void> setMaximizable(bool value) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setMaximizable$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setMaximizable$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1253,10 +1189,8 @@ class WindowHostApi {
   }
 
   Future<void> setClosable(bool value) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setClosable$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setClosable$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1277,10 +1211,8 @@ class WindowHostApi {
   }
 
   Future<void> setFrameless(bool value) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setFrameless$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setFrameless$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1301,10 +1233,8 @@ class WindowHostApi {
   }
 
   Future<void> setTitleBarStyle(TitleBarStyleRaw style) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setTitleBarStyle$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setTitleBarStyle$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1325,10 +1255,8 @@ class WindowHostApi {
   }
 
   Future<void> setOpacity(double opacity) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setOpacity$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setOpacity$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1349,10 +1277,8 @@ class WindowHostApi {
   }
 
   Future<void> setBackgroundColor(int argb) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setBackgroundColor$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setBackgroundColor$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1373,10 +1299,8 @@ class WindowHostApi {
   }
 
   Future<void> setHasShadow(bool value) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setHasShadow$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setHasShadow$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1397,16 +1321,14 @@ class WindowHostApi {
   }
 
   Future<void> setIcon(String filesystemPath) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setIcon$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setIcon$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final List<Object?>? pigeonVar_replyList = await pigeonVar_channel
-        .send(<Object?>[filesystemPath]) as List<Object?>?;
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[filesystemPath]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
       throw _createConnectionError(pigeonVar_channelName);
     } else if (pigeonVar_replyList.length > 1) {
@@ -1437,10 +1359,8 @@ class WindowHostApi {
   ///   setFrameless(true) for the desired effect.
   /// - Linux: deferred to v0.3.0 (X11 SHAPE extension / Wayland subsurface).
   Future<void> setShape(List<OffsetRaw>? points) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setShape$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setShape$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1461,10 +1381,8 @@ class WindowHostApi {
   }
 
   Future<void> setPreventClose(bool value) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setPreventClose$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.setPreventClose$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1485,10 +1403,8 @@ class WindowHostApi {
   }
 
   Future<List<DisplayRaw>> listDisplays() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.listDisplays$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.listDisplays$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1514,10 +1430,8 @@ class WindowHostApi {
   }
 
   Future<DisplayRaw> getCurrentDisplay() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.getCurrentDisplay$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.getCurrentDisplay$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1543,10 +1457,8 @@ class WindowHostApi {
   }
 
   Future<DisplayRaw> getPrimaryDisplay() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.getPrimaryDisplay$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.icefelix_window_manager.WindowHostApi.getPrimaryDisplay$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1594,29 +1506,20 @@ abstract class WindowFlutterApi {
   ///   behavior consistent across platforms.
   bool onCloseRequest();
 
-  static void setUp(
-    WindowFlutterApi? api, {
-    BinaryMessenger? binaryMessenger,
-    String messageChannelSuffix = '',
-  }) {
-    messageChannelSuffix =
-        messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  static void setUp(WindowFlutterApi? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
+    messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
-      final BasicMessageChannel<
-          Object?> pigeonVar_channel = BasicMessageChannel<
-              Object?>(
-          'dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onSnapshotChanged$messageChannelSuffix',
-          pigeonChannelCodec,
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onSnapshotChanged$messageChannelSuffix', pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-              'Argument for dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onSnapshotChanged was null.');
+          'Argument for dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onSnapshotChanged was null.');
           final List<Object?> args = (message as List<Object?>?)!;
-          final WindowSnapshotRaw? arg_snapshot =
-              (args[0] as WindowSnapshotRaw?);
+          final WindowSnapshotRaw? arg_snapshot = (args[0] as WindowSnapshotRaw?);
           assert(arg_snapshot != null,
               'Argument for dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onSnapshotChanged was null, expected non-null WindowSnapshotRaw.');
           try {
@@ -1624,29 +1527,24 @@ abstract class WindowFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          } catch (e) {
-            return wrapResponse(
-                error: PlatformException(code: 'error', message: e.toString()));
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<
-          Object?> pigeonVar_channel = BasicMessageChannel<
-              Object?>(
-          'dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onDisplaysChanged$messageChannelSuffix',
-          pigeonChannelCodec,
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onDisplaysChanged$messageChannelSuffix', pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-              'Argument for dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onDisplaysChanged was null.');
+          'Argument for dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onDisplaysChanged was null.');
           final List<Object?> args = (message as List<Object?>?)!;
-          final List<DisplayRaw>? arg_displays =
-              (args[0] as List<Object?>?)?.cast<DisplayRaw>();
+          final List<DisplayRaw>? arg_displays = (args[0] as List<Object?>?)?.cast<DisplayRaw>();
           assert(arg_displays != null,
               'Argument for dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onDisplaysChanged was null, expected non-null List<DisplayRaw>.');
           try {
@@ -1654,19 +1552,15 @@ abstract class WindowFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          } catch (e) {
-            return wrapResponse(
-                error: PlatformException(code: 'error', message: e.toString()));
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<
-          Object?> pigeonVar_channel = BasicMessageChannel<
-              Object?>(
-          'dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onCloseRequest$messageChannelSuffix',
-          pigeonChannelCodec,
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.icefelix_window_manager.WindowFlutterApi.onCloseRequest$messageChannelSuffix', pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
@@ -1677,9 +1571,8 @@ abstract class WindowFlutterApi {
             return wrapResponse(result: output);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          } catch (e) {
-            return wrapResponse(
-                error: PlatformException(code: 'error', message: e.toString()));
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }

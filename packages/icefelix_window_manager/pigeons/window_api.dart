@@ -161,6 +161,9 @@ enum DisplayServerRaw { x11, wayland }
     cppHeaderOut: 'windows/messages.g.h',
     cppSourceOut: 'windows/messages.g.cpp',
     cppOptions: CppOptions(namespace: 'icefelix_window_manager'),
+    gobjectHeaderOut: 'linux/messages.g.h',
+    gobjectSourceOut: 'linux/messages.g.cc',
+    gobjectOptions: GObjectOptions(module: 'IcefelixWindowManager'),
     copyrightHeader: 'pigeons/copyright.txt',
   ),
 )

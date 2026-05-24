@@ -45,3 +45,5 @@ flutter:
         pluginClass: IcefelixWindowManagerPlugin
       windows:
         pluginClass: IcefelixWindowManagerPluginCApi
+      linux:
+        pluginClass: IcefelixWindowManagerPlugin
