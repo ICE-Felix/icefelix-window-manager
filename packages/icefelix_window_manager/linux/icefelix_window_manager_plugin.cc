@@ -428,6 +428,7 @@ static IcefelixWindowManagerWindowHostApiFocusResponse* h_focus(
 
 static IcefelixWindowManagerWindowHostApiSetTitleResponse* h_set_title(
     const gchar* title, gpointer user_data) {
+  g_print("[icefelix] h_set_title called: title=%s\n", title ? title : "(null)");
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   GtkWindow* window = get_gtk_window(self);
   if (window != nullptr) gtk_window_set_title(window, title);
