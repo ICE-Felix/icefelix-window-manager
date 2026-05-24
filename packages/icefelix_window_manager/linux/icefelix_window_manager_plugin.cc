@@ -212,6 +212,7 @@ static void install_signal_handlers(IcefelixWindowManagerPlugin* self) {
 
 static IcefelixWindowManagerWindowHostApiEnsureInitializedResponse*
 h_ensure_initialized(gpointer user_data) {
+  g_warning("[icefelix] h_ensure_initialized called");
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   // Install signal handlers on first call (the GtkWindow is available by now).
   install_signal_handlers(self);
