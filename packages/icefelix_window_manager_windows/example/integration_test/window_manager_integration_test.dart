@@ -162,4 +162,29 @@ void main() {
     await WindowManager.instance.setSkipTaskbar(false);
     await waitForSnapshot((s) => s.skipTaskbar == false);
   });
+
+  // Regression: preventClose=true + a listener calling event.preventDefault()
+  // must block the close. Was silently broken when the WindowManager._events
+  // stream was async-broadcast: the Pigeon-generated onCloseRequest reads
+  // _closeRequestBlocked synchronously, before the queued microtask listener
+  // could run, so prevent_default was a no-op. Fixed by making the stream
+  // sync:true. Uses the public debugSimulateCloseRequest hook so we can
+  // verify the verdict end-to-end without actually closing the testbed.
+  testWidgets('preventClose: synchronous preventDefault blocks close', (
+    tester,
+  ) async {
+    await WindowManager.instance.setPreventClose(true);
+    final sub = WindowManager.instance.events.listen((event) {
+      if (event is WindowCloseRequestEvent) {
+        event.preventDefault();
+      }
+    });
+    final allowed = await WindowManager.instance.debugSimulateCloseRequest();
+    await sub.cancel();
+    await WindowManager.instance.setPreventClose(false);
+    expect(allowed, isFalse,
+        reason: 'preventDefault() in a listener should set the verdict '
+            'to deny, even though listeners are async-scheduled in some '
+            'Dart stream configurations');
+  });
 }

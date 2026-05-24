@@ -36,8 +36,15 @@ class WindowManager {
   final _SnapshotValueNotifier _snapshot = _SnapshotValueNotifier();
   WindowPlatform? _platform;
   bool _initialized = false;
+  // sync:true so listeners run synchronously during _events.add(). Required
+  // by the preventClose flow: the Pigeon-generated WindowFlutterApi.onCloseRequest
+  // returns bool synchronously (no await), so the adapter has to read
+  // _closeRequestBlocked BEFORE returning. Default async delivery would queue
+  // the listener as a microtask and the adapter would always return allow,
+  // making event.preventDefault() a no-op on the close path. Sync delivery is
+  // also fine for snapshot/display events — typical listeners are sync.
   final StreamController<WindowEvent> _events =
-      StreamController<WindowEvent>.broadcast();
+      StreamController<WindowEvent>.broadcast(sync: true);
   late final WindowDisplays _displays = createWindowDisplays();
   bool _closeRequestBlocked = false;
 
@@ -518,10 +525,12 @@ class _FlutterApiAdapter implements WindowFlutterApi {
 
   /// Pigeon-generated [WindowFlutterApi.onCloseRequest] is synchronous (returns
   /// `bool`). [WindowManager.onCloseRequest] is `Future<bool>` because it
-  /// yields a microtask for async listeners. We bridge by ignoring the future
-  /// here — broadcast StreamController.add delivers synchronously to direct
-  /// listeners, so any synchronous `preventDefault()` is honoured before we
-  /// read `_closeRequestBlocked` via the manager's private flag flow.
+  /// yields a microtask for async listeners. We bridge by reading
+  /// `_closeRequestBlocked` immediately after `_events.add(event)` — that
+  /// only works because the events stream uses `sync: true`, so any
+  /// synchronous `preventDefault()` in a listener runs inline before
+  /// `_events.add` returns. The async pieces (e.g. a follow-up dialog) keep
+  /// running after we return; they just can't change the close decision.
   @override
   bool onCloseRequest() {
     // Fire & forget the async flow — the synchronous parts (event dispatch +
