@@ -427,6 +427,7 @@ static IcefelixWindowManagerWindowHostApiSetTitleResponse* h_set_title(
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   GtkWindow* window = get_gtk_window(self);
   if (window != nullptr) gtk_window_set_title(window, title);
+  schedule_snapshot_emit(self);
   return icefelix_window_manager_window_host_api_set_title_response_new();
 }
 
@@ -435,6 +436,7 @@ static IcefelixWindowManagerWindowHostApiSetAlwaysOnTopResponse* h_set_always_on
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   GtkWindow* window = get_gtk_window(self);
   if (window != nullptr) gtk_window_set_keep_above(window, value);
+  schedule_snapshot_emit(self);
   return icefelix_window_manager_window_host_api_set_always_on_top_response_new();
 }
 
@@ -444,6 +446,7 @@ static IcefelixWindowManagerWindowHostApiSetSkipTaskbarResponse* h_set_skip_task
   GtkWindow* window = get_gtk_window(self);
   self->skip_taskbar_flag = value;
   if (window != nullptr) gtk_window_set_skip_taskbar_hint(window, value);
+  schedule_snapshot_emit(self);
   return icefelix_window_manager_window_host_api_set_skip_taskbar_response_new();
 }
 
@@ -452,6 +455,7 @@ static IcefelixWindowManagerWindowHostApiSetResizableResponse* h_set_resizable(
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   GtkWindow* window = get_gtk_window(self);
   if (window != nullptr) gtk_window_set_resizable(window, value);
+  schedule_snapshot_emit(self);
   return icefelix_window_manager_window_host_api_set_resizable_response_new();
 }
 
@@ -460,6 +464,7 @@ static IcefelixWindowManagerWindowHostApiSetClosableResponse* h_set_closable(
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   GtkWindow* window = get_gtk_window(self);
   if (window != nullptr) gtk_window_set_deletable(window, value);
+  schedule_snapshot_emit(self);
   return icefelix_window_manager_window_host_api_set_closable_response_new();
 }
 
@@ -476,6 +481,7 @@ static IcefelixWindowManagerWindowHostApiSetFramelessResponse* h_set_frameless(
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   GtkWindow* window = get_gtk_window(self);
   if (window != nullptr) gtk_window_set_decorated(window, !value);
+  schedule_snapshot_emit(self);
   return icefelix_window_manager_window_host_api_set_frameless_response_new();
 }
 
@@ -500,6 +506,7 @@ static IcefelixWindowManagerWindowHostApiSetOpacityResponse* h_set_opacity(
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   GtkWindow* window = get_gtk_window(self);
   if (window != nullptr) gtk_widget_set_opacity(GTK_WIDGET(window), opacity);
+  schedule_snapshot_emit(self);
   return icefelix_window_manager_window_host_api_set_opacity_response_new();
 }
 
@@ -521,6 +528,7 @@ static IcefelixWindowManagerWindowHostApiSetIconResponse* h_set_icon(
   if (window != nullptr && filesystem_path != nullptr) {
     gtk_window_set_icon_from_file(window, filesystem_path, nullptr);
   }
+  schedule_snapshot_emit(self);
   return icefelix_window_manager_window_host_api_set_icon_response_new();
 }
 
