@@ -1,12 +1,13 @@
 // Copyright 2026 icefelix.com. BSD-3-Clause.
 //
-// Integration tests for icefelix_window_manager_macos.
+// Integration tests for icefelix_window_manager — run against a real
+// native window on macOS, Windows, or Linux. Drive with:
 //
-// Run from `example/`:
+//     flutter test integration_test/ -d <macos|windows|linux>
 //
-//     flutter test integration_test/ -d macos
-//
-// These open a real NSWindow on the host. Fine for dev machines.
+// Linux note: requires a running window manager. Under headless CI use
+// scripts/xvfb-with-wm.sh (Xvfb + openbox). Without a WM, GTK resize
+// requests are silent no-ops and most tests time out at 2s.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,10 +67,20 @@ void main() {
     await waitForSnapshot((s) => s.alwaysOnTop == false);
   });
 
-  testWidgets('platform.target == TargetPlatform.macOS', (tester) async {
-    expect(WindowManager.instance.platform.target, TargetPlatform.macOS);
-    // displayServer is Linux-only; null on macOS.
-    expect(WindowManager.instance.platform.displayServer, isNull);
+  testWidgets('platform.target matches host', (tester) async {
+    final target = WindowManager.instance.platform.target;
+    expect(
+      target,
+      isIn([TargetPlatform.macOS, TargetPlatform.windows, TargetPlatform.linux]),
+      reason: 'plugin only supports desktop targets',
+    );
+    final displayServer = WindowManager.instance.platform.displayServer;
+    if (target == TargetPlatform.linux) {
+      expect(displayServer, isNotNull);
+      expect(displayServer, isIn(['x11', 'wayland']));
+    } else {
+      expect(displayServer, isNull);
+    }
   });
 
   testWidgets('displays.list returns at least one Display with primary', (
