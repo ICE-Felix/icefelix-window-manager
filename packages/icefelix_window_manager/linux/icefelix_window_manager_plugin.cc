@@ -25,6 +25,8 @@ struct _IcefelixWindowManagerPlugin {
   gboolean skip_taskbar_flag;
   gboolean always_on_top_flag;
   gboolean maximizable_flag;
+  gboolean movable_flag;
+  gboolean minimizable_flag;
   gboolean prevent_close_flag;
   IcefelixWindowManagerTitleBarStyleRaw title_bar_style_flag;
   int64_t background_color_argb_flag;
@@ -37,6 +39,12 @@ struct _IcefelixWindowManagerPlugin {
 
   // Coalescing timer id for snapshot emit.
   guint snapshot_emit_source;
+
+  // Last captured button-press event for startDrag / startResize.
+  GdkEvent* last_button_press;
+
+  // CSS provider for setBackgroundColor.
+  GtkCssProvider* bg_css_provider;
 };
 
 G_DEFINE_TYPE(IcefelixWindowManagerPlugin, icefelix_window_manager_plugin,
@@ -205,11 +213,9 @@ static IcefelixWindowManagerWindowSnapshotRaw* build_snapshot(
   gdouble opacity =
       window != nullptr ? gtk_widget_get_opacity(GTK_WIDGET(window)) : 1.0;
 
-  // For "movable" GTK doesn't expose a getter; mirror tracked flag (assume
-  // movable=true unless we explicitly disabled it via WM_NCHITTEST analog).
-  // For now, just report TRUE.
-  gboolean movable = TRUE;
-  gboolean minimizable = TRUE;
+  // Mirror tracked flags for movable/minimizable.
+  gboolean movable = self->movable_flag;
+  gboolean minimizable = self->minimizable_flag;
 
   return icefelix_window_manager_window_snapshot_raw_new(
       bounds, current_state(window), title, is_focused,
@@ -264,6 +270,14 @@ static gboolean on_focus_in_event(GtkWidget* /*w*/, GdkEvent* /*e*/, gpointer ud
 }
 static gboolean on_focus_out_event(GtkWidget* /*w*/, GdkEvent* /*e*/, gpointer ud) {
   schedule_snapshot_emit(ICEFELIX_WINDOW_MANAGER_PLUGIN(ud));
+  return FALSE;
+}
+static gboolean on_button_press(GtkWidget* /*w*/, GdkEvent* event, gpointer ud) {
+  IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(ud);
+  if (self->last_button_press != nullptr) {
+    gdk_event_free(self->last_button_press);
+  }
+  self->last_button_press = gdk_event_copy(event);
   return FALSE;
 }
 // Forward declaration for the async close-request response callback.
@@ -383,6 +397,8 @@ static void install_signal_handlers(IcefelixWindowManagerPlugin* self) {
   g_signal_connect(window, "focus-in-event", G_CALLBACK(on_focus_in_event), self);
   g_signal_connect(window, "focus-out-event", G_CALLBACK(on_focus_out_event), self);
   g_signal_connect(window, "delete-event", G_CALLBACK(on_delete_event), self);
+  g_signal_connect(window, "button-press-event", G_CALLBACK(on_button_press), self);
+  gtk_widget_add_events(GTK_WIDGET(window), GDK_BUTTON_PRESS_MASK);
 
   GdkDisplay* gdk_display = gdk_display_get_default();
   if (gdk_display != nullptr) {
@@ -708,13 +724,35 @@ static IcefelixWindowManagerWindowHostApiSetOpacityResponse* h_set_opacity(
   return icefelix_window_manager_window_host_api_set_opacity_response_new();
 }
 
+// Task 12: setBackgroundColor via GtkCssProvider.
+// The Pigeon-generated signature is non-nullable int64_t argb (ARGB packed).
 static IcefelixWindowManagerWindowHostApiSetBackgroundColorResponse*
 h_set_background_color(int64_t argb, gpointer user_data) {
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
+  GtkWindow* window = get_gtk_window(self);
   self->background_color_argb_flag = argb;
   self->background_color_set = TRUE;
-  // TODO(linux v0.4.x): apply via GtkStyleContext + CSS provider, or set
-  // GdkRGBA on the GtkWindow background. Currently flag-tracked only.
+  if (window != nullptr) {
+    guint8 a = (guint8)((argb >> 24) & 0xFF);
+    guint8 r = (guint8)((argb >> 16) & 0xFF);
+    guint8 g_val = (guint8)((argb >> 8) & 0xFF);
+    guint8 b = (guint8)(argb & 0xFF);
+    g_autofree gchar* css = g_strdup_printf(
+        "window { background-color: rgba(%u, %u, %u, %g); }",
+        r, g_val, b, a / 255.0);
+    if (self->bg_css_provider == nullptr) {
+      self->bg_css_provider = gtk_css_provider_new();
+      GtkStyleContext* ctx = gtk_widget_get_style_context(GTK_WIDGET(window));
+      gtk_style_context_add_provider(
+          ctx, GTK_STYLE_PROVIDER(self->bg_css_provider),
+          GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    }
+    g_autoptr(GError) err = nullptr;
+    gtk_css_provider_load_from_data(self->bg_css_provider, css, -1, &err);
+    if (err != nullptr) {
+      g_warning("icefelix_window_manager: CSS load failed: %s", err->message);
+    }
+  }
   schedule_snapshot_emit(self);
   return icefelix_window_manager_window_host_api_set_background_color_response_new();
 }
@@ -746,17 +784,54 @@ static IcefelixWindowManagerWindowHostApiSetHasShadowResponse* h_set_has_shadow(
   return icefelix_window_manager_window_host_api_set_has_shadow_response_new();
 }
 
-// ----- Stub-only handlers (filled in later patches) -----
+// ----- Implemented handlers (Tasks 10-13) -----
 
-#define STUB(name, Name, SIG)                                                       \
-  static IcefelixWindowManagerWindowHostApi##Name##Response* h_##name SIG {         \
-    return icefelix_window_manager_window_host_api_##name##_response_new();         \
+static IcefelixWindowManagerWindowHostApiBlurResponse* h_blur(gpointer /*ud*/) {
+  return icefelix_window_manager_window_host_api_blur_response_new();
+}
+
+// Task 10: startDrag via captured button-press event.
+static IcefelixWindowManagerWindowHostApiStartDragResponse* h_start_drag(
+    gpointer user_data) {
+  IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
+  GtkWindow* window = get_gtk_window(self);
+  if (window != nullptr && self->last_button_press != nullptr) {
+    GdkEventButton* btn = (GdkEventButton*)self->last_button_press;
+    gtk_window_begin_move_drag(
+        window, btn->button, (gint)btn->x_root, (gint)btn->y_root, btn->time);
   }
+  return icefelix_window_manager_window_host_api_start_drag_response_new();
+}
 
-STUB(blur, Blur, (gpointer /*ud*/))
-STUB(start_drag, StartDrag, (gpointer /*ud*/))
-STUB(start_resize, StartResize,
-     (IcefelixWindowManagerResizeDirectionRaw /*dir*/, gpointer /*ud*/))
+// Task 11: startResize maps ResizeDirection -> GdkWindowEdge.
+static GdkWindowEdge resize_direction_to_gdk_edge(
+    IcefelixWindowManagerResizeDirectionRaw dir) {
+  switch (dir) {
+    case ICEFELIX_WINDOW_MANAGER_RESIZE_DIRECTION_RAW_TOP:          return GDK_WINDOW_EDGE_NORTH;
+    case ICEFELIX_WINDOW_MANAGER_RESIZE_DIRECTION_RAW_TOP_RIGHT:    return GDK_WINDOW_EDGE_NORTH_EAST;
+    case ICEFELIX_WINDOW_MANAGER_RESIZE_DIRECTION_RAW_RIGHT:        return GDK_WINDOW_EDGE_EAST;
+    case ICEFELIX_WINDOW_MANAGER_RESIZE_DIRECTION_RAW_BOTTOM_RIGHT: return GDK_WINDOW_EDGE_SOUTH_EAST;
+    case ICEFELIX_WINDOW_MANAGER_RESIZE_DIRECTION_RAW_BOTTOM:       return GDK_WINDOW_EDGE_SOUTH;
+    case ICEFELIX_WINDOW_MANAGER_RESIZE_DIRECTION_RAW_BOTTOM_LEFT:  return GDK_WINDOW_EDGE_SOUTH_WEST;
+    case ICEFELIX_WINDOW_MANAGER_RESIZE_DIRECTION_RAW_LEFT:         return GDK_WINDOW_EDGE_WEST;
+    case ICEFELIX_WINDOW_MANAGER_RESIZE_DIRECTION_RAW_TOP_LEFT:     return GDK_WINDOW_EDGE_NORTH_WEST;
+  }
+  return GDK_WINDOW_EDGE_SOUTH_EAST;
+}
+
+static IcefelixWindowManagerWindowHostApiStartResizeResponse* h_start_resize(
+    IcefelixWindowManagerResizeDirectionRaw direction, gpointer user_data) {
+  IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
+  GtkWindow* window = get_gtk_window(self);
+  if (window != nullptr && self->last_button_press != nullptr) {
+    GdkEventButton* btn = (GdkEventButton*)self->last_button_press;
+    gtk_window_begin_resize_drag(
+        window, resize_direction_to_gdk_edge(direction),
+        btn->button, (gint)btn->x_root, (gint)btn->y_root, btn->time);
+  }
+  return icefelix_window_manager_window_host_api_start_resize_response_new();
+}
+
 // close: routes through delete-event, respects preventClose two-pass flow.
 static IcefelixWindowManagerWindowHostApiCloseResponse* h_close(
     gpointer user_data) {
@@ -778,11 +853,34 @@ static IcefelixWindowManagerWindowHostApiDestroyResponse* h_destroy(
   }
   return icefelix_window_manager_window_host_api_destroy_response_new();
 }
-STUB(set_movable, SetMovable, (gboolean /*value*/, gpointer /*ud*/))
-STUB(set_minimizable, SetMinimizable, (gboolean /*value*/, gpointer /*ud*/))
-STUB(set_shape, SetShape, (FlValue* /*points*/, gpointer /*ud*/))
 
-#undef STUB
+// Task 11 (cont): movable/minimizable flag tracking.
+static IcefelixWindowManagerWindowHostApiSetMovableResponse* h_set_movable(
+    gboolean value, gpointer user_data) {
+  IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
+  self->movable_flag = value;
+  schedule_snapshot_emit(self);
+  return icefelix_window_manager_window_host_api_set_movable_response_new();
+}
+
+static IcefelixWindowManagerWindowHostApiSetMinimizableResponse* h_set_minimizable(
+    gboolean value, gpointer user_data) {
+  IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
+  self->minimizable_flag = value;
+  schedule_snapshot_emit(self);
+  return icefelix_window_manager_window_host_api_set_minimizable_response_new();
+}
+
+// Task 13: setShape acknowledged no-op.
+static IcefelixWindowManagerWindowHostApiSetShapeResponse* h_set_shape(
+    FlValue* /*points*/, gpointer /*user_data*/) {
+  static gboolean warned = FALSE;
+  if (!warned) {
+    g_warning("icefelix_window_manager: setShape is not yet implemented on Linux (v0.4.0)");
+    warned = TRUE;
+  }
+  return icefelix_window_manager_window_host_api_set_shape_response_new();
+}
 
 // ----- Multi-monitor (stubs returning defaults) -----
 
@@ -862,6 +960,11 @@ static void icefelix_window_manager_plugin_dispose(GObject* object) {
     g_source_remove(self->snapshot_emit_source);
     self->snapshot_emit_source = 0;
   }
+  if (self->last_button_press != nullptr) {
+    gdk_event_free(self->last_button_press);
+    self->last_button_press = nullptr;
+  }
+  g_clear_object(&self->bg_css_provider);
   g_clear_object(&self->flutter_api);
   G_OBJECT_CLASS(icefelix_window_manager_plugin_parent_class)->dispose(object);
 }
@@ -873,6 +976,8 @@ static void icefelix_window_manager_plugin_class_init(
 
 static void icefelix_window_manager_plugin_init(IcefelixWindowManagerPlugin* self) {
   self->maximizable_flag = TRUE;
+  self->movable_flag = TRUE;
+  self->minimizable_flag = TRUE;
   self->has_shadow_flag = TRUE;
   self->title_bar_style_flag = ICEFELIX_WINDOW_MANAGER_TITLE_BAR_STYLE_RAW_NORMAL;
 }
