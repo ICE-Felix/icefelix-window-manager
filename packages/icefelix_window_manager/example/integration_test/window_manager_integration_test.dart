@@ -32,6 +32,7 @@ void main() {
   }) async {
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
+      await WindowManager.instance.refreshSnapshot();
       if (predicate(WindowManager.instance.snapshot.value)) return;
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }

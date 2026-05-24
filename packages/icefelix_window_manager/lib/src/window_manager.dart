@@ -309,6 +309,15 @@ class WindowManager {
     _initialized = true;
   }
 
+  /// **Testing only.** Pulls a fresh snapshot from the native side and updates
+  /// [snapshot]. Useful on Linux where the FlutterApi push channel may not
+  /// deliver during `testWidgets` due to a flutter_linux binding interaction.
+  @visibleForTesting
+  Future<void> refreshSnapshot() async {
+    final pigeonSnap = await WindowManagerPlatform.instance.ensureInitialized();
+    _snapshot._set(_convertSnapshot(pigeonSnap));
+  }
+
   /// **Testing only.** Resets singleton state between tests.
   @visibleForTesting
   static void resetForTesting() {

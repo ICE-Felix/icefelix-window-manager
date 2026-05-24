@@ -37,6 +37,9 @@ struct _IcefelixWindowManagerPlugin {
   gboolean allow_next_close;
   gboolean close_request_in_flight;
 
+  // Guard: install_signal_handlers is idempotent.
+  gboolean signals_installed;
+
   // Coalescing timer id for snapshot emit.
   guint snapshot_emit_source;
 
@@ -389,8 +392,10 @@ static void on_monitor_removed(GdkDisplay* /*d*/, GdkMonitor* /*m*/, gpointer ud
 }
 
 static void install_signal_handlers(IcefelixWindowManagerPlugin* self) {
+  if (self->signals_installed) return;
   GtkWindow* window = get_gtk_window(self);
   if (window == nullptr) return;
+  self->signals_installed = TRUE;
   g_signal_connect(window, "size-allocate", G_CALLBACK(on_size_allocate), self);
   g_signal_connect(window, "configure-event", G_CALLBACK(on_configure_event), self);
   g_signal_connect(window, "window-state-event", G_CALLBACK(on_window_state_event), self);
