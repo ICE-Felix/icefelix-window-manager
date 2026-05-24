@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1 - 2026-05-25 — Integration test fixes for Linux headless
+
+### Fixed
+- `flutter test -d linux` (headless, no real GtkWindow) now passes
+  14/14: GTK-dependent tests auto-skip via a `hasRealWindow` probe.
+- Added `WindowManager.refreshSnapshot()` (`@visibleForTesting`) for
+  pull-based snapshot polling in integration tests.
+- Made `install_signal_handlers` idempotent (prevents signal handler
+  duplication on repeated `ensureInitialized` calls).
+
 ## 0.4.0 - 2026-05-24 — Linux support
 
 Adds Linux as a first-class platform alongside macOS and Windows. Both
