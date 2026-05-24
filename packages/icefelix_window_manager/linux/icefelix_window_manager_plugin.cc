@@ -430,6 +430,10 @@ static IcefelixWindowManagerWindowHostApiFocusResponse* h_focus(
 static IcefelixWindowManagerWindowHostApiSetTitleResponse* h_set_title(
     const gchar* title, gpointer user_data) {
   g_warning("[icefelix] h_set_title called: title=%s\n", title ? title : "(null)");
+  {
+    FILE* f = fopen("/tmp/icefelix_debug.log", "a");
+    if (f) { fprintf(f, "h_set_title: %s\n", title ? title : "(null)"); fclose(f); }
+  }
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   GtkWindow* window = get_gtk_window(self);
   if (window != nullptr) gtk_window_set_title(window, title);
@@ -619,6 +623,10 @@ static void icefelix_window_manager_plugin_init(IcefelixWindowManagerPlugin* sel
 void icefelix_window_manager_plugin_register_with_registrar(
     FlPluginRegistrar* registrar) {
   g_warning("[icefelix] plugin_register_with_registrar called");
+  {
+    FILE* f = fopen("/tmp/icefelix_debug.log", "a");
+    if (f) { fprintf(f, "register_with_registrar called\n"); fclose(f); }
+  }
   IcefelixWindowManagerPlugin* plugin = ICEFELIX_WINDOW_MANAGER_PLUGIN(
       g_object_new(icefelix_window_manager_plugin_get_type(), nullptr));
   plugin->registrar = registrar;
