@@ -23,6 +23,7 @@ struct _IcefelixWindowManagerPlugin {
 
   // Tracked flags for properties GTK doesn't expose directly (mirrors macOS).
   gboolean skip_taskbar_flag;
+  gboolean always_on_top_flag;
   gboolean maximizable_flag;
   gboolean prevent_close_flag;
   IcefelixWindowManagerTitleBarStyleRaw title_bar_style_flag;
@@ -125,7 +126,7 @@ static IcefelixWindowManagerWindowSnapshotRaw* build_snapshot(
 
   return icefelix_window_manager_window_snapshot_raw_new(
       bounds, current_state(window), title, is_focused,
-      /* always_on_top */ FALSE,  // TODO: track via gtk_window_set_keep_above
+      /* always_on_top */ self->always_on_top_flag,
       /* skip_taskbar */ self->skip_taskbar_flag, resizable, movable,
       minimizable, self->maximizable_flag, closable, frameless,
       self->title_bar_style_flag, opacity,
@@ -435,6 +436,7 @@ static IcefelixWindowManagerWindowHostApiSetAlwaysOnTopResponse* h_set_always_on
     gboolean value, gpointer user_data) {
   IcefelixWindowManagerPlugin* self = ICEFELIX_WINDOW_MANAGER_PLUGIN(user_data);
   GtkWindow* window = get_gtk_window(self);
+  self->always_on_top_flag = value;
   if (window != nullptr) gtk_window_set_keep_above(window, value);
   schedule_snapshot_emit(self);
   return icefelix_window_manager_window_host_api_set_always_on_top_response_new();
@@ -571,7 +573,11 @@ STUB(set_shape, SetShape, (FlValue* /*points*/, gpointer /*ud*/))
 
 static IcefelixWindowManagerWindowHostApiListDisplaysResponse* h_list_displays(
     gpointer /*user_data*/) {
+  IcefelixWindowManagerDisplayRaw* display = make_default_display_raw();
   g_autoptr(FlValue) display_list = fl_value_new_list();
+  fl_value_append_take(display_list,
+      fl_value_new_custom_object(137, G_OBJECT(display)));
+  g_object_unref(display);
   return icefelix_window_manager_window_host_api_list_displays_response_new(display_list);
 }
 static IcefelixWindowManagerWindowHostApiGetCurrentDisplayResponse*
