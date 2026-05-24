@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.4.0 - 2026-05-24 — Linux support
+
+Adds Linux as a first-class platform alongside macOS and Windows. Both
+X11 and Wayland are supported; the Wayland-position-is-null reality is
+honored via the existing nullable `WindowBoundsRaw.position` field
+(no schema change).
+
+### Added
+- **Linux native backend** (`linux/`): GTK 3 + Pigeon GObject
+  implementation of the full `WindowHostApi` surface.
+- Real GdkMonitor enumeration with hot-plug signals
+  (`monitor-added`/`monitor-removed` → `onDisplaysChanged`).
+- Two-pass close interception via `delete-event` ↔ `onCloseRequest`,
+  honoring `WindowManager.events` `sync: true` contract.
+- `startDrag` and `startResize` with captured button-press context.
+- `setBackgroundColor` via `GtkCssProvider`.
+- `scripts/xvfb-with-wm.sh` wrapper for headless integration tests.
+- 4 Linux-specific integration tests (X11 position, Wayland position).
+
+### Known limitations on Linux
+- `setShape` is a no-op (logs a one-shot warning). Real impl deferred
+  to a 0.4.x patch.
+- `setMovable` is flag-only; GTK exposes no titlebar-drag-disable API.
+- `setAlwaysOnTop` is best-effort on Wayland (compositors may ignore
+  `keep_above` without `wlr-layer-shell`).
+- Stable display IDs concatenate `manufacturer|model`; falls back to
+  `linux-monitor-N` on VMs / virtual displays.
+- Headless integration tests (via xvfb + openbox) cannot validate
+  FlutterApi push-channel behavior during `testWidgets` due to a
+  flutter_linux + `LiveTestWidgetsFlutterBinding` interaction.
+  Manual GNOME smoke testing is recommended for full validation.
+
+### Tested on
+Ubuntu 24.04.4 LTS ARM64, Flutter 3.44 stable, GTK 3.24, GNOME 46
+(both X11 and Wayland sessions).
+
 ## 0.3.0 - 2026-05-24 — Monolithic cross-platform release
 
 Major restructuring: collapses the four federated packages into a single

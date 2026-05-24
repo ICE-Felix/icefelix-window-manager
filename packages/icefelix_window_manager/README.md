@@ -5,13 +5,15 @@
 
 Cross-platform window management for Flutter desktop apps. Control your app's own window — size, position, state, multi-monitor, frameless mode, custom shapes, and events — with a type-safe Pigeon-backed API and reactive `ValueListenable<WindowSnapshot>` as the single source of truth.
 
-**v0.3.0 — single package, macOS + Windows native.** This release collapses the four federated packages from 0.2.x into one. macOS (Swift + AppKit) and Windows (C++ + Win32) ship inside this package. No more `_macos`, `_windows`, or `_platform_interface` packages to depend on.
+**v0.4.0 — single package, macOS + Windows + Linux native.** Adds Linux as a first-class platform alongside macOS and Windows. Both X11 and Wayland are supported. This release builds on v0.3.0's monolithic layout — macOS (Swift + AppKit), Windows (C++ + Win32), and Linux (C + GTK 3) all ship inside one package.
 
 ## Platform support
 
-| macOS 10.15+ | Windows 10+ | Linux |
-|:-:|:-:|:-:|
-| ✅ Shipping | ✅ Shipping | ⏳ Planned (v0.4) |
+| Platform | Status |
+|----------|--------|
+| macOS 10.15+ | ✅ Shipping |
+| Windows 10+ | ✅ Shipping |
+| Linux (X11 + Wayland) | ✅ Shipping (v0.4.0) |
 
 ## Installation
 
@@ -83,9 +85,9 @@ await WindowManager.instance.setShape([
 
 `dependencies: icefelix_window_manager: ^0.3.0` — that's it. If you ever called `IcefelixWindowManagerMacos.registerWith()` or `IcefelixWindowManagerWindows.registerWith()` directly, remove those calls. Flutter now auto-registers the plugin via the pubspec `pluginClass` declarations. Nothing else changes.
 
-## Linux roadmap
+## Linux
 
-Linux (X11 + Wayland via libdecor) is planned for v0.4. Track progress on [GitHub](https://github.com/ICE-Felix/icefelix-window-manager).
+Linux support (X11 + Wayland via GTK 3) ships in v0.4.0. Both display servers are supported; Wayland's position-is-null reality is honored via the existing nullable `WindowBoundsRaw.position` field. See CHANGELOG.md for known limitations (`setShape` is a no-op pending a follow-up patch). Track development on [GitHub](https://github.com/ICE-Felix/icefelix-window-manager).
 
 ## License
 
