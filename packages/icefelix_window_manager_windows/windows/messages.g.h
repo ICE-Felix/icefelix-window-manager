@@ -566,6 +566,23 @@ class WindowHostApi {
   virtual std::optional<FlutterError> SetBackgroundColor(int64_t argb) = 0;
   virtual std::optional<FlutterError> SetHasShadow(bool value) = 0;
   virtual std::optional<FlutterError> SetIcon(const std::string& filesystem_path) = 0;
+  // Replace the window's visible region with a polygon defined by [points]
+  // (window-relative LOGICAL pixels — same coord space as setSize). Pixels
+  // outside the polygon are not part of the window at the OS level: they
+  // don't paint AND clicks pass through to whatever is behind on the desktop.
+  //
+  // Pass `null` to clear the shape and restore the default rectangular
+  // region.
+  //
+  // Platform behavior:
+  // - Windows: implemented via `CreatePolygonRgn` + `SetWindowRgn`. True
+  //   non-rectangular hit-testing. Frameless windows give the cleanest
+  //   result (no chrome around the shape).
+  // - macOS: best-effort via NSWindow.contentView.layer mask. Hit-testing
+  //   for the title bar / chrome is unaffected — clear the title bar via
+  //   setFrameless(true) for the desired effect.
+  // - Linux: deferred to v0.3.0 (X11 SHAPE extension / Wayland subsurface).
+  virtual std::optional<FlutterError> SetShape(const flutter::EncodableList* points) = 0;
   virtual std::optional<FlutterError> SetPreventClose(bool value) = 0;
   virtual ErrorOr<flutter::EncodableList> ListDisplays() = 0;
   virtual ErrorOr<DisplayRaw> GetCurrentDisplay() = 0;

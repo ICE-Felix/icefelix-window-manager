@@ -253,6 +253,21 @@ class WindowManager {
   Future<void> setIcon(String filesystemPath) =>
       WindowManagerPlatform.instance.setIcon(filesystemPath);
 
+  /// Replace the window's visible region with the polygon defined by [points]
+  /// (window-relative logical pixels — same coord space as [setSize]). Pixels
+  /// outside the polygon are not part of the window at the OS level: they
+  /// don't paint AND clicks pass through to whatever's behind on the desktop.
+  ///
+  /// Pass `null` to clear and restore the default rectangular region.
+  ///
+  /// Windows: native `SetWindowRgn`. macOS: `NSWindow.contentView.layer` mask
+  /// (visual only — chrome unaffected; pair with [setFrameless] for the
+  /// expected effect). Linux: not implemented in v0.3.x.
+  Future<void> setShape(List<Offset>? points) =>
+      WindowManagerPlatform.instance.setShape(
+        points?.map((p) => OffsetRaw(dx: p.dx, dy: p.dy)).toList(),
+      );
+
   // =========================================================================
   // CLOSE INTERCEPTION
   // =========================================================================

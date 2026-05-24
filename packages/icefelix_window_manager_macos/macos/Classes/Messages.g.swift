@@ -541,6 +541,23 @@ protocol WindowHostApi {
   func setBackgroundColor(argb: Int64) throws
   func setHasShadow(value: Bool) throws
   func setIcon(filesystemPath: String) throws
+  /// Replace the window's visible region with a polygon defined by [points]
+  /// (window-relative LOGICAL pixels — same coord space as setSize). Pixels
+  /// outside the polygon are not part of the window at the OS level: they
+  /// don't paint AND clicks pass through to whatever is behind on the desktop.
+  ///
+  /// Pass `null` to clear the shape and restore the default rectangular
+  /// region.
+  ///
+  /// Platform behavior:
+  /// - Windows: implemented via `CreatePolygonRgn` + `SetWindowRgn`. True
+  ///   non-rectangular hit-testing. Frameless windows give the cleanest
+  ///   result (no chrome around the shape).
+  /// - macOS: best-effort via NSWindow.contentView.layer mask. Hit-testing
+  ///   for the title bar / chrome is unaffected — clear the title bar via
+  ///   setFrameless(true) for the desired effect.
+  /// - Linux: deferred to v0.3.0 (X11 SHAPE extension / Wayland subsurface).
+  func setShape(points: [OffsetRaw]?) throws
   func setPreventClose(value: Bool) throws
   func listDisplays() throws -> [DisplayRaw]
   func getCurrentDisplay() throws -> DisplayRaw
@@ -1109,6 +1126,37 @@ class WindowHostApiSetup {
       }
     } else {
       setIconChannel.setMessageHandler(nil)
+    }
+    /// Replace the window's visible region with a polygon defined by [points]
+    /// (window-relative LOGICAL pixels — same coord space as setSize). Pixels
+    /// outside the polygon are not part of the window at the OS level: they
+    /// don't paint AND clicks pass through to whatever is behind on the desktop.
+    ///
+    /// Pass `null` to clear the shape and restore the default rectangular
+    /// region.
+    ///
+    /// Platform behavior:
+    /// - Windows: implemented via `CreatePolygonRgn` + `SetWindowRgn`. True
+    ///   non-rectangular hit-testing. Frameless windows give the cleanest
+    ///   result (no chrome around the shape).
+    /// - macOS: best-effort via NSWindow.contentView.layer mask. Hit-testing
+    ///   for the title bar / chrome is unaffected — clear the title bar via
+    ///   setFrameless(true) for the desired effect.
+    /// - Linux: deferred to v0.3.0 (X11 SHAPE extension / Wayland subsurface).
+    let setShapeChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setShape\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      setShapeChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let pointsArg: [OffsetRaw]? = nilOrValue(args[0])
+        do {
+          try api.setShape(points: pointsArg)
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      setShapeChannel.setMessageHandler(nil)
     }
     let setPreventCloseChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setPreventClose\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
