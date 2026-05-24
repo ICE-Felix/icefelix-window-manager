@@ -168,4 +168,40 @@ void main() {
           'configurations. Fix: WindowManager._events is sync:true.',
     );
   });
+
+  // ─── Linux-specific tests ───────────────────────────────────────────────
+
+  testWidgets('linux x11: snapshot.bounds.position is non-null', (tester) async {
+    if (WindowManager.instance.platform.target != TargetPlatform.linux) return;
+    if (WindowManager.instance.platform.displayServer != DisplayServer.x11) return;
+    final snap = WindowManager.instance.snapshot.value;
+    expect(snap.bounds.position, isNotNull,
+        reason: 'X11 exposes window position; position must be non-null');
+  });
+
+  testWidgets('linux wayland: snapshot.bounds.position is null', (tester) async {
+    if (WindowManager.instance.platform.target != TargetPlatform.linux) return;
+    if (WindowManager.instance.platform.displayServer != DisplayServer.wayland) return;
+    final snap = WindowManager.instance.snapshot.value;
+    expect(snap.bounds.position, isNull,
+        reason: 'Wayland does not expose window position; must be null');
+  });
+
+  testWidgets('linux x11: setPosition then snapshot reflects it', (tester) async {
+    if (WindowManager.instance.platform.target != TargetPlatform.linux) return;
+    if (WindowManager.instance.platform.displayServer != DisplayServer.x11) return;
+    await WindowManager.instance.setPosition(const Offset(120, 80));
+    await waitForSnapshot((s) =>
+        s.bounds.position != null &&
+        s.bounds.position!.dx == 120 &&
+        s.bounds.position!.dy == 80);
+  });
+
+  testWidgets('linux wayland: setPosition is silently no-op', (tester) async {
+    if (WindowManager.instance.platform.target != TargetPlatform.linux) return;
+    if (WindowManager.instance.platform.displayServer != DisplayServer.wayland) return;
+    await WindowManager.instance.setPosition(const Offset(100, 100));
+    final snap = WindowManager.instance.snapshot.value;
+    expect(snap.bounds.position, isNull);
+  });
 }
