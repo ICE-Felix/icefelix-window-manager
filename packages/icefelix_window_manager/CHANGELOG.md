@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.3.0 - 2026-05-24 — Monolithic cross-platform release
+
+Major restructuring: collapses the four federated packages into a single
+plugin. No API changes from 0.2.1 — same `WindowManager`, same setters,
+same events, same `setShape`. Just one package on pub.dev instead of four.
+
+### Changed
+- **Layout: federated → monolithic.** The native code for macOS (Swift +
+  AppKit) and Windows (C++ + Win32) now ships inside the same
+  `icefelix_window_manager` package as the Dart API. The four packages
+  used in 0.2.x are collapsed into one:
+  - `icefelix_window_manager_macos@0.2.0` — **discontinued**, code merged
+  - `icefelix_window_manager_windows@0.2.0` — **discontinued**, code merged
+  - `icefelix_window_manager_platform_interface@0.2.0` — **discontinued**,
+    schema and abstract base merged in
+  - `icefelix_window_manager@0.2.1` → **`icefelix_window_manager@0.3.0`**
+- Pigeon-generated bindings now live at `lib/src/messages.g.dart`,
+  `macos/Classes/Messages.g.swift`, `windows/messages.g.{h,cpp}` inside
+  the single package.
+- Swift plugin class renamed `IcefelixWindowManagerMacosPlugin` →
+  `IcefelixWindowManagerPlugin`. Windows C-API plugin class renamed
+  similarly. App code does not import these directly so this is
+  transparent; only an issue if you were manually invoking
+  `IcefelixWindowManagerMacos.registerWith()` — Flutter now
+  auto-registers via the `pluginClass` in pubspec.yaml.
+
+### Why
+The federated pattern is recommended when multiple vendors own different
+platform impls (e.g. Google maintains macOS, community maintains Linux
+for a Google plugin). For a single-owner plugin, the federated overhead
+— four pubspecs to keep in sync, four CHANGELOGs, version-coordination
+bugs every time the schema changes — outweighs the benefits. v0.2.0
+shipped with a real broken dep-version mismatch that we papered over in
+0.2.1; rather than continue to maintain four packages, we collapse to
+one.
+
+### Migration
+```yaml
+# Before (any 0.2.x):
+dependencies:
+  icefelix_window_manager: ^0.2.0     # the only thing you wrote anyway
+# Plus possibly indirect deps on _macos, _windows, _platform_interface
+
+# After (0.3.0):
+dependencies:
+  icefelix_window_manager: ^0.3.0     # same one-line dep, fewer transitive packages
+```
+
+If your code did `IcefelixWindowManagerMacos.registerWith()` or
+`IcefelixWindowManagerWindows.registerWith()` directly, **remove those
+calls** — Flutter now auto-registers the plugin via the pubspec
+`pluginClass` declarations.
+
+### Verified
+- 72 unit tests pass
+- 10 integration tests pass on real macOS NSWindow (including the
+  `setMaxSize honored by maximize() in frame coords` and `preventClose:
+  synchronous preventDefault blocks close` regression contracts)
+
 ## 0.2.1 - 2026-05-24
 
 ### Changed

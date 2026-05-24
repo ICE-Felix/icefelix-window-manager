@@ -3,11 +3,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:icefelix_window_manager_platform_interface/icefelix_window_manager_platform_interface.dart';
 import 'package:meta/meta.dart';
 
 import 'display.dart';
+import 'messages.g.dart';
 import 'window_event.dart';
+import 'window_manager_platform.dart';
 
 /// Multi-monitor sub-namespace.
 ///

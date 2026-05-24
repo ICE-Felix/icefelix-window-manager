@@ -1,44 +1,38 @@
 # icefelix_window_manager
 
-Window management for Flutter desktop apps — your app, your window.
-Control size, position, state, multi-monitor placement, frameless mode,
-title bar style, opacity, shadow, drag/resize regions, and listen to
-window/display events through a single reactive snapshot.
+Cross-platform window management for Flutter desktop apps — your app, your
+window. Control size, position, state, multi-monitor placement, frameless
+mode, custom window shapes, title bar style, opacity, shadow, drag/resize
+regions, and listen to window/display events through a single reactive
+snapshot.
 
-**Status:** macOS shipping in v0.1.0. Windows + Linux on the roadmap.
+**v0.3.0 — single package, native macOS + Windows.** v0.2.x shipped as
+four federated packages; v0.3.0 collapses them into one — same API, same
+behavior, just one dependency.
 
 ## Platform support
 
-| Platform | Status | Version |
+| Platform | Status | Native stack |
 |---|---|---|
-| macOS 10.15+ | ✅ Shipping | v0.1.0 (Swift + AppKit) |
-| Windows 10+ | ⏳ Planned | v0.2.x (C++ + Win32) |
-| Linux (X11 + Wayland) | ⏳ Planned | v0.3.x (C++ + GTK + libdecor) |
+| macOS 10.15+ | ✅ Shipping | Swift + AppKit (NSWindow) |
+| Windows 10+ | ✅ Shipping | C++ + Win32 |
+| Linux (X11 + Wayland) | ⏳ Planned for v0.4 | GTK 3 + libdecor |
 
 Mobile (iOS, Android) and web are out of scope — Flutter does not give an
 embedded app control over the host window on those platforms.
 
-## Packages
-
-This is a federated plugin: one app-facing package, one platform
-interface, and one implementation per platform.
-
-| Package | Purpose | pub.dev |
-|---|---|---|
-| [`icefelix_window_manager`](https://pub.dev/packages/icefelix_window_manager) | App-facing API | v0.1.0 |
-| [`icefelix_window_manager_platform_interface`](https://pub.dev/packages/icefelix_window_manager_platform_interface) | Abstract API + Pigeon schema | v0.1.0 |
-| [`icefelix_window_manager_macos`](https://pub.dev/packages/icefelix_window_manager_macos) | macOS implementation | v0.1.0 |
-
-App developers depend on `icefelix_window_manager` only; the federation
-resolves the right platform impl automatically.
-
-## Quick start
+## Install
 
 ```yaml
-# pubspec.yaml
 dependencies:
-  icefelix_window_manager: ^0.1.0
+  icefelix_window_manager: ^0.3.0
 ```
+
+That's it. No `_macos` / `_windows` / `_platform_interface` to add — those
+0.2.x packages are now discontinued and their content lives inside the
+single package above.
+
+## Quick start
 
 ```dart
 import 'package:flutter/material.dart';
@@ -51,9 +45,26 @@ Future<void> main() async {
 }
 ```
 
-See per-package READMEs for the full API surface and the example app at
-[`packages/icefelix_window_manager_macos/example/`](packages/icefelix_window_manager_macos/example/)
-exercising every method.
+See per-package README at [`packages/icefelix_window_manager/`](packages/icefelix_window_manager/)
+for the full API + the testbed at `example/` exercising every method on
+both platforms.
+
+## Migrating from 0.2.x
+
+```yaml
+# Before
+dependencies:
+  icefelix_window_manager: ^0.2.0   # was the only thing you wrote anyway
+
+# After
+dependencies:
+  icefelix_window_manager: ^0.3.0   # same one-liner; fewer transitive deps now
+```
+
+If your code called `IcefelixWindowManagerMacos.registerWith()` or
+`IcefelixWindowManagerWindows.registerWith()` directly, **remove those
+calls** — Flutter now auto-registers via the pubspec `pluginClass`
+declarations.
 
 ## License
 

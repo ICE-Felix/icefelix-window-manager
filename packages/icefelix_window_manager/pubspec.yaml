@@ -1,8 +1,8 @@
 name: icefelix_window_manager
 description: >-
-  Window management for Flutter desktop apps. Size, position, state,
-  multi-monitor, frameless, events. macOS today; Windows + Linux next.
-version: 0.2.1
+  Cross-platform window management for Flutter desktop. Size, position,
+  state, multi-monitor, frameless, events. macOS + Windows in one package.
+version: 0.3.0
 repository: https://github.com/ICE-Felix/icefelix-window-manager
 issue_tracker: https://github.com/ICE-Felix/icefelix-window-manager/issues
 homepage: https://icefelix.com/packages/window-manager
@@ -13,10 +13,6 @@ topics: [window, desktop, multi-monitor, ui, platform-integration]
 funding:
   - https://icefelix.com/sponsor
   - https://github.com/sponsors/alexbordei
-
-platforms:
-  macos:
-  windows:
 
 screenshots:
   - description: >-
@@ -32,7 +28,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  icefelix_window_manager_platform_interface: ^0.2.0
+  plugin_platform_interface: ^2.1.8
   meta: ^1.15.0
 
 dev_dependencies:
@@ -40,3 +36,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   mocktail: ^1.0.4
+  pigeon: ^22.0.0
+
+flutter:
+  plugin:
+    platforms:
+      macos:
+        pluginClass: IcefelixWindowManagerPlugin
+      windows:
+        pluginClass: IcefelixWindowManagerPluginCApi

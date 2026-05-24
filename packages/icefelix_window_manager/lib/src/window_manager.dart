@@ -4,13 +4,14 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:icefelix_window_manager_platform_interface/icefelix_window_manager_platform_interface.dart';
 
 import 'display.dart';
+import 'messages.g.dart';
 import 'resize_direction.dart';
 import 'title_bar_style.dart';
 import 'window_displays.dart';
 import 'window_event.dart';
+import 'window_manager_platform.dart';
 import 'window_platform.dart';
 import 'window_snapshot.dart';
 import 'window_state.dart';

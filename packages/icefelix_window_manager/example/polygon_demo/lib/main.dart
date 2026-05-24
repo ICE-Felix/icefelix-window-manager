@@ -12,13 +12,11 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:icefelix_window_manager/icefelix_window_manager.dart';
-import 'package:icefelix_window_manager_windows/icefelix_window_manager_windows.dart';
 
 const double _windowSize = 360.0;
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
-  IcefelixWindowManagerWindows.registerWith();
   await WindowManager.instance.ensureInitialized();
 
   final cfg = _parseArgs(args);

@@ -3,8 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icefelix_window_manager/icefelix_window_manager.dart';
-import 'package:icefelix_window_manager_platform_interface/icefelix_window_manager_platform_interface.dart';
+import 'package:icefelix_window_manager/src/messages.g.dart';
+import 'package:icefelix_window_manager/src/window_manager_platform.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 class MockWindowManagerPlatform extends Mock
     with MockPlatformInterfaceMixin

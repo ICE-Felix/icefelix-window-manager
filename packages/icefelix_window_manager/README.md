@@ -3,15 +3,15 @@
 [![pub package](https://img.shields.io/pub/v/icefelix_window_manager.svg)](https://pub.dev/packages/icefelix_window_manager)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
-Cross-platform window management for Flutter desktop apps. Control your app's own window — size, position, state, multi-monitor, frameless mode, and events — with a type-safe Pigeon-backed API and reactive `ValueListenable<WindowSnapshot>` as the single source of truth.
+Cross-platform window management for Flutter desktop apps. Control your app's own window — size, position, state, multi-monitor, frameless mode, custom shapes, and events — with a type-safe Pigeon-backed API and reactive `ValueListenable<WindowSnapshot>` as the single source of truth.
 
-⚠️ **Pre-release: v0.1.0-dev.3.** Native implementations land in W2 (macOS ✅), W3 (Windows), W4 (Linux). v0.1.0 stable ships ~26 June 2026. The Dart API in this dev release is the final shape.
+**v0.3.0 — single package, macOS + Windows native.** This release collapses the four federated packages from 0.2.x into one. macOS (Swift + AppKit) and Windows (C++ + Win32) ship inside this package. No more `_macos`, `_windows`, or `_platform_interface` packages to depend on.
 
 ## Platform support
 
-| macOS | Windows | Linux (X11) | Linux (Wayland) |
-|:-:|:-:|:-:|:-:|
-| ✅ v0.1.0-dev.3 | ⏳ W3 | ⏳ W4 | ⏳ W4 |
+| macOS 10.15+ | Windows 10+ | Linux |
+|:-:|:-:|:-:|
+| ✅ Shipping | ✅ Shipping | ⏳ Planned (v0.4) |
 
 ## Installation
 
@@ -79,9 +79,13 @@ await WindowManager.instance.setShape([
 ]);
 ```
 
-## Status
+## Migrating from 0.2.x
 
-This is **W2 (macOS native impl complete)**. See [project tracker](https://github.com/ICE-Felix/icefelix-window-manager) for Windows + Linux progress.
+`dependencies: icefelix_window_manager: ^0.3.0` — that's it. If you ever called `IcefelixWindowManagerMacos.registerWith()` or `IcefelixWindowManagerWindows.registerWith()` directly, remove those calls. Flutter now auto-registers the plugin via the pubspec `pluginClass` declarations. Nothing else changes.
+
+## Linux roadmap
+
+Linux (X11 + Wayland via libdecor) is planned for v0.4. Track progress on [GitHub](https://github.com/ICE-Felix/icefelix-window-manager).
 
 ## License
 

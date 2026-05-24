@@ -19,12 +19,6 @@ dependencies:
     sdk: flutter
   icefelix_window_manager:
     path: ../..
-  icefelix_window_manager_windows:
-    path: ../../../icefelix_window_manager_windows
-
-dependency_overrides:
-  icefelix_window_manager_platform_interface:
-    path: ../../../icefelix_window_manager_platform_interface
 
 dev_dependencies:
   flutter_lints: ^5.0.0
