@@ -1420,6 +1420,46 @@ class WindowHostApi {
     }
   }
 
+  /// Replace the window's visible region with a polygon defined by [points]
+  /// (window-relative LOGICAL pixels — same coord space as setSize). Pixels
+  /// outside the polygon are not part of the window at the OS level: they
+  /// don't paint AND clicks pass through to whatever is behind on the desktop.
+  ///
+  /// Pass `null` to clear the shape and restore the default rectangular
+  /// region.
+  ///
+  /// Platform behavior:
+  /// - Windows: implemented via `CreatePolygonRgn` + `SetWindowRgn`. True
+  ///   non-rectangular hit-testing. Frameless windows give the cleanest
+  ///   result (no chrome around the shape).
+  /// - macOS: best-effort via NSWindow.contentView.layer mask. Hit-testing
+  ///   for the title bar / chrome is unaffected — clear the title bar via
+  ///   setFrameless(true) for the desired effect.
+  /// - Linux: deferred to v0.3.0 (X11 SHAPE extension / Wayland subsurface).
+  Future<void> setShape(List<OffsetRaw>? points) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setShape$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[points]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
   Future<void> setPreventClose(bool value) async {
     final String pigeonVar_channelName =
         'dev.flutter.pigeon.icefelix_window_manager_platform_interface.WindowHostApi.setPreventClose$pigeonVar_messageChannelSuffix';

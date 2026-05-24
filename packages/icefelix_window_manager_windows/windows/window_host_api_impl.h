@@ -99,6 +99,8 @@ class WindowHostApiImpl : public WindowHostApi {
   std::optional<FlutterError> SetHasShadow(bool value) override;
   std::optional<FlutterError> SetIcon(
       const std::string& filesystem_path) override;
+  std::optional<FlutterError> SetShape(
+      const flutter::EncodableList* points) override;
 
   // Close interception
   std::optional<FlutterError> SetPreventClose(bool value) override;

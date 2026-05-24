@@ -127,6 +127,8 @@ class IcefelixWindowManagerMacos extends WindowManagerPlatform {
   @override
   Future<void> setIcon(String filesystemPath) =>
       _hostApi.setIcon(filesystemPath);
+  @override
+  Future<void> setShape(List<OffsetRaw>? points) => _hostApi.setShape(points);
 
   // ============ CLOSE INTERCEPTION ============
   @override

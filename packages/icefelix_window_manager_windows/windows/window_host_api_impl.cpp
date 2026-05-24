@@ -1010,6 +1010,50 @@ std::optional<FlutterError> WindowHostApiImpl::SetIcon(
   return std::nullopt;
 }
 
+std::optional<FlutterError> WindowHostApiImpl::SetShape(
+    const flutter::EncodableList* points) {
+  if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
+  // null/empty -> clear the region, restore default rectangular window.
+  // SetWindowRgn(hwnd, nullptr, TRUE) is the documented way to remove it.
+  if (!points || points->empty()) {
+    SetWindowRgn(hwnd_, nullptr, TRUE);
+    return std::nullopt;
+  }
+  if (points->size() < 3) {
+    return FlutterError("invalid_shape",
+                        "setShape requires at least 3 points; got " +
+                            std::to_string(points->size()));
+  }
+  const double scale = ScaleFactor();
+  std::vector<POINT> win_points;
+  win_points.reserve(points->size());
+  for (const auto& v : *points) {
+    // Each entry is a CustomEncodableValue wrapping an OffsetRaw whose dx/dy
+    // are LOGICAL pixels (same coord space as setSize). Convert to physical.
+    const auto& off = std::any_cast<const OffsetRaw&>(
+        std::get<flutter::CustomEncodableValue>(v));
+    POINT p;
+    p.x = static_cast<LONG>(std::round(off.dx() * scale));
+    p.y = static_cast<LONG>(std::round(off.dy() * scale));
+    win_points.push_back(p);
+  }
+  // CreatePolygonRgn -> SetWindowRgn. SetWindowRgn takes ownership of the
+  // HRGN; do NOT DeleteObject it after this call. ALTERNATE fill mode
+  // handles convex AND concave polygons identically here (single contour).
+  HRGN hrgn = CreatePolygonRgn(win_points.data(),
+                               static_cast<int>(win_points.size()), ALTERNATE);
+  if (!hrgn) {
+    return FlutterError("region_create_failed",
+                        "CreatePolygonRgn returned NULL");
+  }
+  if (!SetWindowRgn(hwnd_, hrgn, TRUE)) {
+    DeleteObject(hrgn);
+    return FlutterError("region_apply_failed",
+                        "SetWindowRgn returned 0");
+  }
+  return std::nullopt;
+}
+
 std::optional<FlutterError> WindowHostApiImpl::SetPreventClose(bool value) {
   if (!InstallIfNeeded()) return FlutterError(kNoWindow, "No HWND available");
   // Honored by the WM_CLOSE case in HandleMessage(): when true, it fires

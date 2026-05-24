@@ -92,6 +92,7 @@ abstract class WindowManagerPlatform extends PlatformInterface {
   Future<void> setBackgroundColor(int argb) => throw UnimplementedError();
   Future<void> setHasShadow(bool value) => throw UnimplementedError();
   Future<void> setIcon(String filesystemPath) => throw UnimplementedError();
+  Future<void> setShape(List<OffsetRaw>? points) => throw UnimplementedError();
 
   // ============ CLOSE INTERCEPTION ============
   Future<void> setPreventClose(bool value) => throw UnimplementedError();

@@ -669,6 +669,44 @@ class WindowHostApiImpl: NSObject, WindowHostApi {
     scheduleSnapshotEmit()
   }
 
+  func setShape(points: [OffsetRaw]?) throws {
+    // macOS best-effort: mask NSWindow.contentView.layer with a CAShapeLayer
+    // tracing the polygon. Visually clips the Flutter content area; the
+    // window's title bar / chrome remain rectangular. Pair with
+    // setFrameless(true) (which removes the .titled style mask) for the
+    // expected effect. Hit-testing follows the unmodified window frame —
+    // clicks on "transparent" pixels still go to the window, not through.
+    // True non-rectangular hit-testing on macOS needs `isOpaque=false` +
+    // CGColor.clear + manual NSWindow subclassing; deferred to a future
+    // patch release.
+    let w = try requireWindow()
+    guard let contentLayer = w.contentView?.layer else { return }
+    if points == nil || points!.isEmpty {
+      contentLayer.mask = nil
+      return
+    }
+    if points!.count < 3 {
+      throw PigeonError(
+        code: "invalid_shape",
+        message: "setShape requires at least 3 points; got \(points!.count)",
+        details: nil
+      )
+    }
+    let path = CGMutablePath()
+    for (i, p) in points!.enumerated() {
+      let cgp = CGPoint(x: p.dx, y: p.dy)
+      if i == 0 {
+        path.move(to: cgp)
+      } else {
+        path.addLine(to: cgp)
+      }
+    }
+    path.closeSubpath()
+    let mask = CAShapeLayer()
+    mask.path = path
+    contentLayer.mask = mask
+  }
+
   // ============ CLOSE INTERCEPTION ============
 
   func setPreventClose(value: Bool) throws {
