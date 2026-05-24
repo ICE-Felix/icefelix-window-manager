@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `setShape(List<Offset>? points)` — sets the OS window region to a polygon
+  defined by the given points (window-relative logical pixels). Pixels
+  outside the polygon don't paint AND clicks pass through to the desktop
+  (true non-rectangular hit-testing). Pass `null` to clear and restore the
+  default rectangular region. Windows: `CreatePolygonRgn` + `SetWindowRgn`.
+  macOS: `NSWindow.contentView.layer` mask (visual only — chrome stays
+  rectangular; pair with `setFrameless(true)` for the expected effect).
+  Linux: not implemented in v0.3.x.
+- `example/polygon_demo/` — showcase Flutter Windows app exercising the
+  new shape API together with `setFrameless`, `setOpacity`, `setSize`,
+  `startDrag`, `minimize`, and `destroy`. Argv-parameterized so a launcher
+  script can spawn a swarm of differently-shaped windows for promo art.
+- Promo screenshot at `screenshots/polygon_promo.png` showing 10 such
+  windows side-by-side. Declared via the pubspec `screenshots:` field for
+  pub.dev rendering.
+
+### Fixed
+- `WindowManager.events` stream is now `sync: true` so a listener's
+  synchronous `event.preventDefault()` on a `WindowCloseRequestEvent`
+  actually blocks the close. Previously the default async broadcast queued
+  the listener as a microtask, so the Pigeon-generated synchronous handler
+  returned `allow` before the listener could vote — making the
+  preventClose flow a silent no-op end-to-end on every platform.
+
 ## 0.2.0 - 2026-05-24
 
 ### Added
