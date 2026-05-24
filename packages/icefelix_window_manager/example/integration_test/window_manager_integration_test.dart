@@ -78,7 +78,7 @@ void main() {
     final displayServer = WindowManager.instance.platform.displayServer;
     if (target == TargetPlatform.linux) {
       expect(displayServer, isNotNull);
-      expect(displayServer, isIn(['x11', 'wayland']));
+      expect(displayServer, isIn([DisplayServer.x11, DisplayServer.wayland]));
     } else {
       expect(displayServer, isNull);
     }
