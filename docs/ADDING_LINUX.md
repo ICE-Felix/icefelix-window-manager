@@ -1,8 +1,7 @@
 # Adding Linux support to icefelix_window_manager
 
-This guide is for the agent (human or Claude) implementing the Linux
-backend for `icefelix_window_manager` as of v0.4. Read [`CLAUDE.md`](../CLAUDE.md)
-first.
+This guide is for implementing the Linux backend for
+`icefelix_window_manager` as of v0.4.
 
 **Target:** the existing `icefelix_window_manager` package gets a `linux/`
 sibling to `macos/Classes/` and `windows/`. It ships as v0.4.0. No new
