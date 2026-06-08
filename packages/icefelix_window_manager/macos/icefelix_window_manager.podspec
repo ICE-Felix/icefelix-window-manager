@@ -11,7 +11,7 @@ management. Wraps NSWindow / AppKit on macOS via Pigeon-typed channels.
   s.author           = { 'icefelix.com' => 'alex.bordei@icefelix.com' }
 
   s.source           = { :path => '.' }
-  s.source_files     = 'Classes/**/*'
+  s.source_files     = 'icefelix_window_manager/Sources/icefelix_window_manager/**/*.swift'
   s.dependency 'FlutterMacOS'
 
   s.platform = :osx, '10.15'

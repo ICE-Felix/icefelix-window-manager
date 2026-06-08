@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 - 2026-06-08 — Swift Package Manager support (pub.dev 160/160)
+
+### Added
+- **Swift Package Manager support on macOS.** Added
+  `macos/icefelix_window_manager/Package.swift` and moved the Swift sources to
+  `macos/icefelix_window_manager/Sources/icefelix_window_manager/`. CocoaPods
+  remains fully supported (the podspec now points at the new source location),
+  so existing apps are unaffected. This earns the final 10 pub points
+  (Platform support 20/20) → **pana 160/160**.
+
+### Fixed
+- Removed unreachable `homepage`/`funding` URLs on `icefelix.com` from the
+  pubspec (kept the working GitHub Sponsors funding link).
+
 ## 0.4.2 - 2026-05-25 — Description & docs update
 
 ### Fixed
