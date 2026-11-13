@@ -6,7 +6,7 @@ Federated Flutter plugin (desktop), publisher pub.dev `icefelix.com`. Reguli de 
 - tracker: Google Tasks, lista „ICE-Felix Flutter Packages”
 - convenția titlurilor de task: „[Fază] pachet — ce se face”
 - remote + unealtă MR: GitHub (`ICE-Felix/icefelix-window-manager`) + `gh`
-- test țintit: `melos run test` din rădăcină (de confirmat comanda exactă)
+- test țintit: `melos run test` din rădăcină
 - e2e: `integration_test` din `packages/icefelix_window_manager/example`
 - mediu dev/prod: nu există (pachet, nu serviciu); „deploy” = publicare pub.dev prin OIDC
 - poarta: `.poarta.conf` încă lipsă
